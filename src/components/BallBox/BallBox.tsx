@@ -5,9 +5,10 @@ import { ScoringEngine } from '../../utils/scoringEngine';
 
 interface BallBoxProps {
   ball: Ball;
+  compact?: boolean;
 }
 
-const BallBox: React.FC<BallBoxProps> = ({ ball }) => {
+const BallBox: React.FC<BallBoxProps> = ({ ball, compact = false }) => {
   const getDisplayText = () => {
     if (ball.isWicket) return 'W';
     if (ball.isWide) return 'WD';
@@ -22,8 +23,8 @@ const BallBox: React.FC<BallBoxProps> = ({ ball }) => {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: getBoxColor() }]}>
-      <Text style={styles.text}>{getDisplayText()}</Text>
+    <View style={[styles.container, { backgroundColor: getBoxColor() }, compact && styles.compact]}>
+      <Text style={[styles.text, compact && styles.compactText]}>{getDisplayText()}</Text>
     </View>
   );
 };
@@ -42,10 +43,18 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
+  compact: {
+    width: 24,
+    height: 24,
+    marginRight: 3,
+  },
   text: {
     color: '#ffffff',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  compactText: {
+    fontSize: 10,
   },
 });
 

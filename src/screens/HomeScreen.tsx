@@ -1,13 +1,35 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+// HomeScreen.tsx
+import React, { useEffect, useRef } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity, 
+  Alert, 
+  Animated,
+  Dimensions 
+} from 'react-native';
 import { useMatchStore } from '../store/matchStore';
+
+const { width } = Dimensions.get('window');
 
 interface HomeScreenProps {
   navigation: any;
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
-  const { currentMatch, matches, createNewMatch, deleteMatch, reset } = useMatchStore();
+  const { currentMatch, matches, deleteMatch, reset } = useMatchStore();
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const scaleAnim = useRef(new Animated.Value(0.9)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 800, useNativeDriver: true }),
+      Animated.timing(scaleAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+    ]).start();
+  }, []);
 
   const handleCreateNewMatch = () => {
     navigation.navigate('CreateMatch');
@@ -43,70 +65,123 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     navigation.navigate('MatchHistory');
   };
 
+  const completedCount = matches.filter(m => m.isCompleted).length;
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Seshu Cricket</Text>
-        <Text style={styles.subtitle}>Local Scoring App</Text>
+      <View style={styles.backgroundPattern}>
+        <View style={styles.circle1} />
+        <View style={styles.circle2} />
       </View>
 
-      <View style={styles.optionsContainer}>
-        <TouchableOpacity 
-          style={[styles.optionButton, styles.createButton]}
-          onPress={handleCreateNewMatch}
-        >
-          <Text style={styles.buttonText}>Create New Match</Text>
-        </TouchableOpacity>
-
-        <View style={styles.continueMatchContainer}>
-          <TouchableOpacity 
-            style={[
-              styles.optionButton, 
-              styles.continueButton,
-              !currentMatch && styles.disabledButton
-            ]}
-            onPress={handleContinueMatch}
-            disabled={!currentMatch}
-          >
-            <Text style={[
-              styles.buttonText,
-              !currentMatch && styles.disabledButtonText
-            ]}>
-              Continue Match
-            </Text>
-            {currentMatch && (
-              <Text style={styles.matchInfo}>
-                {currentMatch.teamName} - {currentMatch.totalRuns}/{currentMatch.wickets}
-              </Text>
-            )}
-          </TouchableOpacity>
-          
-          {currentMatch && (
-            <TouchableOpacity 
-              style={styles.deleteButton}
-              onPress={handleDeleteCurrentMatch}
-            >
-              <Text style={styles.deleteButtonText}>×</Text>
-            </TouchableOpacity>
-          )}
+      <Animated.View 
+        style={[
+          styles.content,
+          { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+        ]}
+      >
+        <View style={styles.header}>
+          <View style={styles.logoContainer}>
+          </View>
+          <Text style={styles.title}>Seshu Cricket</Text>
+          <Text style={styles.subtitle}>Professional Local Scoring</Text>
         </View>
 
-        <TouchableOpacity 
-          style={[styles.optionButton, styles.historyButton]}
-          onPress={handleMatchHistory}
+        <Animated.View 
+          style={[
+            styles.menuContainer,
+            { transform: [{ scale: scaleAnim }] }
+          ]}
         >
-          <Text style={styles.buttonText}>Match History</Text>
-          {matches.length > 0 && (
-            <Text style={styles.matchCount}>
-              {matches.filter(m => m.isCompleted).length} completed matches
-            </Text>
-          )}
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={handleCreateNewMatch}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.iconBg, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
+              <View style={[styles.icon, { backgroundColor: '#10b981' }]}>
+                <Text style={styles.iconText}>+</Text>
+              </View>
+            </View>
+            <View style={styles.menuTextContainer}>
+              <Text style={styles.menuTitle}>New Match</Text>
+              <Text style={styles.menuSubtitle}>Start scoring a fresh game</Text>
+            </View>
+            <View style={styles.chevron}>
+              <View style={styles.chevronInner} />
+            </View>
+          </TouchableOpacity>
 
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>Fully Offline • No Internet Required</Text>
-      </View>
+          <View style={styles.divider} />
+
+          <TouchableOpacity 
+            style={[styles.menuItem, !currentMatch && styles.menuItemDisabled]}
+            onPress={handleContinueMatch}
+            disabled={!currentMatch}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.iconBg, { backgroundColor: currentMatch ? 'rgba(245, 158, 11, 0.15)' : 'rgba(100, 116, 139, 0.1)' }]}>
+              <View style={[styles.icon, { backgroundColor: currentMatch ? '#f59e0b' : '#64748b' }]}>
+                <Text style={styles.iconText}>▶</Text>
+              </View>
+            </View>
+            <View style={styles.menuTextContainer}>
+              <Text style={[styles.menuTitle, !currentMatch && styles.menuTitleDisabled]}>
+                Continue Match
+              </Text>
+              {currentMatch ? (
+                <View style={styles.liveBadge}>
+                  <View style={styles.liveDot} />
+                  <Text style={styles.liveText}>
+                    {currentMatch.totalRuns}/{currentMatch.wickets} • {currentMatch.overs}.{currentMatch.balls % 6} ov
+                  </Text>
+                </View>
+              ) : (
+                <Text style={styles.menuSubtitle}>No active match</Text>
+              )}
+            </View>
+            {currentMatch && (
+              <TouchableOpacity 
+                style={styles.deleteBtn}
+                onPress={handleDeleteCurrentMatch}
+              >
+                <Text style={styles.deleteBtnText}>×</Text>
+              </TouchableOpacity>
+            )}
+          </TouchableOpacity>
+
+          <View style={styles.divider} />
+
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={handleMatchHistory}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.iconBg, { backgroundColor: 'rgba(99, 102, 241, 0.15)' }]}>
+              <View style={[styles.icon, { backgroundColor: '#6366f1' }]}>
+                <Text style={styles.iconText}>📋</Text>
+              </View>
+            </View>
+            <View style={styles.menuTextContainer}>
+              <Text style={styles.menuTitle}>History</Text>
+              <Text style={styles.menuSubtitle}>
+                {completedCount} {completedCount === 1 ? 'match' : 'matches'} completed
+              </Text>
+            </View>
+            <View style={styles.chevron}>
+              <View style={styles.chevronInner} />
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
+
+        <View style={styles.footer}>
+          <View style={styles.offlineBadge}>
+            <View style={styles.offlineDot} />
+            <Text style={styles.footerText}>Fully Offline</Text>
+          </View>
+          <Text style={styles.version}>v2.0</Text>
+        </View>
+      </Animated.View>
     </View>
   );
 };
@@ -114,103 +189,221 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
-    paddingHorizontal: 20,
+    backgroundColor: '#0f172a',
+    overflow: 'hidden',
+  },
+  backgroundPattern: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+  circle1: {
+    position: 'absolute',
+    width: 400,
+    height: 400,
+    borderRadius: 200,
+    backgroundColor: 'rgba(16, 185, 129, 0.03)',
+    top: -100,
+    right: -100,
+  },
+  circle2: {
+    position: 'absolute',
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: 'rgba(99, 102, 241, 0.03)',
+    bottom: 100,
+    left: -50,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 24,
   },
   header: {
     alignItems: 'center',
     marginTop: 80,
-    marginBottom: 60,
+    marginBottom: 50,
+  },
+  logoContainer: {
+    marginBottom: 24,
+  },
+  logoRing: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  logoCore: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: '#10b981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  logoText: {
+    fontSize: 36,
+    fontWeight: '800',
+    color: '#ffffff',
   },
   title: {
     fontSize: 32,
-    fontWeight: 'bold',
-    color: '#059669',
-    marginBottom: 8,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#64748b',
+    marginTop: 8,
+    letterSpacing: 0.5,
   },
-  optionsContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    gap: 20,
+  menuContainer: {
+    backgroundColor: 'rgba(30, 41, 59, 0.4)',
+    borderRadius: 24,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
   },
-  optionButton: {
-    backgroundColor: '#ffffff',
-    padding: 24,
-    borderRadius: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  createButton: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#10b981',
-  },
-  continueButton: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#3b82f6',
-    flex: 1,
-  },
-  continueMatchContainer: {
+  menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    padding: 20,
+    borderRadius: 16,
   },
-  deleteButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#fee2e2',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ef4444',
-  },
-  deleteButtonText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#ef4444',
-    marginTop: -2,
-  },
-  historyButton: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#f59e0b',
-  },
-  disabledButton: {
+  menuItemDisabled: {
     opacity: 0.5,
   },
-  buttonText: {
+  iconBg: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  icon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  iconText: {
+    fontSize: 20,
+    color: '#ffffff',
+    fontWeight: '700',
+  },
+  menuTextContainer: {
+    flex: 1,
+  },
+  menuTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1e293b',
+    fontWeight: '700',
+    color: '#ffffff',
     marginBottom: 4,
   },
-  disabledButtonText: {
-    color: '#94a3b8',
+  menuTitleDisabled: {
+    color: '#64748b',
   },
-  matchInfo: {
+  menuSubtitle: {
     fontSize: 14,
     color: '#64748b',
-    marginTop: 4,
   },
-  matchCount: {
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ef4444',
+    marginRight: 8,
+    shadowColor: '#ef4444',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+  },
+  liveText: {
     fontSize: 14,
-    color: '#64748b',
-    marginTop: 4,
+    color: '#f59e0b',
+    fontWeight: '600',
+  },
+  chevron: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chevronInner: {
+    width: 8,
+    height: 8,
+    borderTopWidth: 2,
+    borderRightWidth: 2,
+    borderColor: '#475569',
+    transform: [{ rotate: '45deg' }],
+  },
+  deleteBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  deleteBtnText: {
+    fontSize: 20,
+    color: '#ef4444',
+    fontWeight: '700',
+    marginTop: -2,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    marginHorizontal: 20,
   },
   footer: {
+    marginTop: 'auto',
+    marginBottom: 40,
     alignItems: 'center',
-    paddingVertical: 20,
+  },
+  offlineBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+  },
+  offlineDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10b981',
+    marginRight: 8,
   },
   footerText: {
+    fontSize: 13,
+    color: '#10b981',
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  version: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: '#475569',
+    marginTop: 12,
   },
 });
 

@@ -58,6 +58,7 @@ const App: React.FC = () => {
           headerTintColor: '#ffffff',
           headerTitleStyle: {
             fontWeight: 'bold',
+            fontSize: 16, // Smaller font size
           },
         }}
       >

@@ -38,7 +38,7 @@ const OversList: React.FC<OversListProps> = ({ overs, currentOverNumber }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#1e293b',
   },
   list: {
     flex: 1,
