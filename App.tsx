@@ -3,19 +3,21 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { databaseService } from './src/services/database';
 import { useMatchStore } from './src/store/matchStore';
+import * as SplashScreen from 'expo-splash-screen';
 
 // Import screens
-import SplashScreen from './src/screens/SplashScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import CreateMatchScreen from './src/screens/CreateMatchScreen';
 import LiveMatchScreen from './src/screens/LiveMatchScreen';
 import MatchHistoryScreen from './src/screens/MatchHistoryScreen';
 import MatchDetailScreen from './src/screens/MatchDetailScreen';
 
+// Keep the splash screen visible while we fetch resources
+SplashScreen.preventAutoHideAsync();
+
 const Stack = createNativeStackNavigator();
 
 const App: React.FC = () => {
-  const [isSplashVisible, setSplashVisible] = useState(false);
   const [isInitialized, setInitialized] = useState(false);
   const { loadMatches } = useMatchStore();
 
@@ -31,15 +33,14 @@ const App: React.FC = () => {
         setInitialized(true);
       } catch (error) {
         console.error('App initialization error:', error);
+      } finally {
+        // Hide splash screen when ready
+        await SplashScreen.hideAsync();
       }
     };
 
     initializeApp();
   }, [loadMatches]);
-
-  const handleSplashFinish = () => {
-    setSplashVisible(false);
-  };
 
   if (!isInitialized) {
     return null; // Show loading screen while initializing
@@ -49,7 +50,7 @@ const App: React.FC = () => {
     <NavigationContainer>
       <Stack.Navigator
         id="MainStack"
-        initialRouteName={isSplashVisible ? 'Splash' : 'Home'}
+        initialRouteName="Home"
         screenOptions={{
           headerStyle: {
             backgroundColor: '#059669',
@@ -60,12 +61,6 @@ const App: React.FC = () => {
           },
         }}
       >
-        <Stack.Screen
-          name="Splash"
-          options={{ headerShown: false }}
-        >
-          {props => <SplashScreen {...props} onFinish={handleSplashFinish} />}
-        </Stack.Screen>
         <Stack.Screen
           name="Home"
           component={HomeScreen}
