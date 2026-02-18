@@ -12,15 +12,15 @@ interface OverRowProps {
 const OverRow: React.FC<OverRowProps> = ({ over, isCurrentOver = false }) => {
   const overNumber = over.overNumber.toString().padStart(2, '0');
   
-  // Get all balls including extras
   const allBalls = over.balls || [];
-  
-  // Filter to only legal deliveries for empty slot calculation
   const legalBalls = allBalls.filter(ball => !ball.isWide && !ball.isNoBall);
   const totalSlots = 6;
-  
+  const ballsRemaining = totalSlots - legalBalls.length;
+
   return (
     <View style={[styles.container, isCurrentOver && styles.currentOver]}>
+      
+      {/* Over header row */}
       <View style={styles.overInfo}>
         <Text style={[styles.overNumber, isCurrentOver && styles.currentOverNumber]}>
           Over {overNumber}:
@@ -28,6 +28,14 @@ const OverRow: React.FC<OverRowProps> = ({ over, isCurrentOver = false }) => {
         <Text style={styles.overSummary}>
           {ScoringEngine.getOverSummary(over)}
         </Text>
+
+        {/* Balls remaining badge — only for current over */}
+        {isCurrentOver && ballsRemaining > 0 && (
+          <View style={styles.ballsRemainingBadge}>
+            <Text style={styles.ballsRemainingText}>{ballsRemaining}</Text>
+            <Text style={styles.ballsRemainingLabel}> left</Text>
+          </View>
+        )}
       </View>
       
       <ScrollView 
@@ -35,24 +43,19 @@ const OverRow: React.FC<OverRowProps> = ({ over, isCurrentOver = false }) => {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.ballsContainer}
       >
-        {/* Show ALL balls including extras (wide/no-ball) */}
+        {/* All bowled balls including wides/no-balls */}
         {allBalls.map((ball, index) => (
           <BallBox key={`${ball.id}_${index}`} ball={ball} />
         ))}
         
-        {/* Fill remaining legal slots with empty placeholders */}
-        {legalBalls.length < totalSlots && (
-          <>
-            {Array.from({ length: totalSlots - legalBalls.length }).map((_, index) => (
-              <View 
-                key={`empty_${index}`} 
-                style={[
-                  styles.emptyBall, 
-                  isCurrentOver && styles.emptyBallCurrent
-                ]} 
-              />
-            ))}
-          </>
+        {/* Empty slots ONLY for current over */}
+        {isCurrentOver && ballsRemaining > 0 && (
+          Array.from({ length: ballsRemaining }).map((_, index) => (
+            <View 
+              key={`empty_${index}`} 
+              style={styles.emptyBall}
+            />
+          ))
         )}
       </ScrollView>
       
@@ -109,24 +112,44 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     flex: 1,
   },
+
+  // Balls remaining badge
+  ballsRemainingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.4)',
+  },
+  ballsRemainingText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#10b981',
+  },
+  ballsRemainingLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#10b981',
+    opacity: 0.8,
+  },
+
   ballsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
-    flexWrap: 'nowrap',
   },
   emptyBall: {
-    width: 34,
-    height: 34,
-    borderRadius: 6,
+    width: 32,
+    height: 32,
+    borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#475569',
-    marginRight: 6,
-    backgroundColor: '#1e293b',
-  },
-  emptyBallCurrent: {
     borderColor: '#64748b',
+    marginRight: 4,
     backgroundColor: '#0f172a',
+    borderStyle: 'dashed',
   },
   overStats: {
     paddingTop: 6,

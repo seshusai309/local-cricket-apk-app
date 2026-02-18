@@ -136,62 +136,63 @@ export class ScoringEngine {
   }
 
   private static handleWide(match: Match): Match {
-    match.totalRuns += 1;
-    match.extras += 1;
+  match.totalRuns += 1;
+  match.extras += 1;
 
-    const bowler = match.players.find((p) => p.id === match.currentBowlerId);
-    if (bowler) {
-      bowler.runsConceded += 1;
-    }
-
-    // Wide is an extra - doesn't increment legal ball count
-    const currentOverNum = this.getCurrentOverNumber(match.balls);
-    const displayBallNum = Math.min(this.getBallNumberInOver(match.balls) + 1, 6);
-
-    this.addBallToOver(match, {
-      id: `ball_${Date.now()}`,
-      overNumber: currentOverNum,
-      ballNumber: displayBallNum,
-      runs: 1,
-      isWicket: false,
-      isWide: true,
-      isNoBall: false,
-      isDot: false,
-      batsmanId: match.currentStrikerId,
-      bowlerId: match.currentBowlerId,
-    });
-
-    return match;
+  const bowler = match.players.find((p) => p.id === match.currentBowlerId);
+  if (bowler) {
+    bowler.runsConceded += 1;
   }
 
-  private static handleNoBall(match: Match): Match {
-    match.totalRuns += 1;
-    match.extras += 1;
+  // Extras belong to the CURRENT over (same over as the next legal ball)
+  // Don't add +1 or clamp — just use match.balls directly to get the current over
+  const currentOverNum = this.getCurrentOverNumber(match.balls + 1); // +1 because balls is 0-indexed pre-increment
+  const displayBallNum = this.getBallNumberInOver(match.balls + 1);
 
-    const bowler = match.players.find((p) => p.id === match.currentBowlerId);
-    if (bowler) {
-      bowler.runsConceded += 1;
-    }
+  this.addBallToOver(match, {
+    id: `ball_${Date.now()}`,
+    overNumber: currentOverNum,
+    ballNumber: displayBallNum,
+    runs: 1,
+    isWicket: false,
+    isWide: true,
+    isNoBall: false,
+    isDot: false,
+    batsmanId: match.currentStrikerId,
+    bowlerId: match.currentBowlerId,
+  });
 
-    // No-ball is an extra - doesn't increment legal ball count
-    const currentOverNum = this.getCurrentOverNumber(match.balls);
-    const displayBallNum = Math.min(this.getBallNumberInOver(match.balls) + 1, 6);
+  return match;
+}
 
-    this.addBallToOver(match, {
-      id: `ball_${Date.now()}`,
-      overNumber: currentOverNum,
-      ballNumber: displayBallNum,
-      runs: 1,
-      isWicket: false,
-      isWide: false,
-      isNoBall: true,
-      isDot: false,
-      batsmanId: match.currentStrikerId,
-      bowlerId: match.currentBowlerId,
-    });
+private static handleNoBall(match: Match): Match {
+  match.totalRuns += 1;
+  match.extras += 1;
 
-    return match;
+  const bowler = match.players.find((p) => p.id === match.currentBowlerId);
+  if (bowler) {
+    bowler.runsConceded += 1;
   }
+
+  // Same logic as wide
+  const currentOverNum = this.getCurrentOverNumber(match.balls + 1);
+  const displayBallNum = this.getBallNumberInOver(match.balls + 1);
+
+  this.addBallToOver(match, {
+    id: `ball_${Date.now()}`,
+    overNumber: currentOverNum,
+    ballNumber: displayBallNum,
+    runs: 1,
+    isWicket: false,
+    isWide: false,
+    isNoBall: true,
+    isDot: false,
+    batsmanId: match.currentStrikerId,
+    bowlerId: match.currentBowlerId,
+  });
+
+  return match;
+}
 
   private static handleDot(match: Match): Match {
     const striker = match.players.find((p) => p.id === match.currentStrikerId);

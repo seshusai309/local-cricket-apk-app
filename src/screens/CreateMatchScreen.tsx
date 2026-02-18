@@ -1,48 +1,72 @@
-// CreateMatchScreen.tsx
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Animated, Easing } from 'react-native';
+import React, { useState, useRef, useCallback } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity, 
+  TextInput, 
+  ScrollView, 
+  Animated, 
+  Easing,
+  Dimensions,
+  Platform
+} from 'react-native';
 import { useMatchStore } from '../store/matchStore';
 
 interface CreateMatchScreenProps {
   navigation: any;
 }
 
+const { width } = Dimensions.get('window');
+
 const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({ navigation }) => {
   const [teamName, setTeamName] = useState('Local Team');
   const [maxOvers, setMaxOvers] = useState('20');
   const [isCreating, setIsCreating] = useState(false);
   const [selectedOvers, setSelectedOvers] = useState(20);
-  const [isCustomInputFocused, setIsCustomInputFocused] = useState(false);
+  const [isCustomMode, setIsCustomMode] = useState(false);
+  const [customOversValue, setCustomOversValue] = useState(20);
   const { createNewMatch } = useMatchStore();
   
-  const scaleAnim = new Animated.Value(1);
-  const glowAnim = new Animated.Value(0);
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
 
-  const animatePress = () => {
+  // Generate custom overs data (1-100)
+  const customOversData = Array.from({ length: 100 }, (_, i) => (i + 1).toString());
+
+  const animatePress = useCallback(() => {
     Animated.sequence([
       Animated.timing(scaleAnim, { toValue: 0.95, duration: 100, useNativeDriver: true }),
       Animated.timing(scaleAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
     ]).start();
-  };
+  }, [scaleAnim]);
 
-  const handleOversSelect = (overs: number) => {
+  const handleOversSelect = useCallback((overs: number) => {
     setSelectedOvers(overs);
     setMaxOvers(overs.toString());
+    setIsCustomMode(false);
+    setCustomOversValue(overs);
     Animated.timing(glowAnim, {
       toValue: 1,
       duration: 300,
       easing: Easing.out(Easing.ease),
       useNativeDriver: true,
     }).start(() => glowAnim.setValue(0));
-  };
+  }, [glowAnim]);
 
-  const handleCustomInputFocus = () => {
-    setIsCustomInputFocused(true);
-  };
+  const handleCustomSelect = useCallback(() => {
+    setIsCustomMode(true);
+    setSelectedOvers(0);
+    // Set to current maxOvers or default to 20
+    const currentVal = parseInt(maxOvers, 10) || 20;
+    setCustomOversValue(currentVal);
+  }, [maxOvers]);
 
-  const handleCustomInputBlur = () => {
-    setIsCustomInputFocused(false);
-  };
+  const handleWheelChange = useCallback((value: string | number, index: number) => {
+    const numValue = typeof value === 'string' ? parseInt(value, 10) : value;
+    setCustomOversValue(numValue);
+    setMaxOvers(numValue.toString());
+  }, []);
 
   const handleCreateMatch = async () => {
     animatePress();
@@ -64,7 +88,6 @@ const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({ navigation }) => 
     <View style={styles.container}>
       <View style={styles.gradientOverlay}>
         <View style={styles.header}>
-          
           <Text style={styles.title}>New Match</Text>
           <Text style={styles.subtitle}>Configure your game settings</Text>
         </View>
@@ -92,47 +115,80 @@ const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({ navigation }) => 
 
             <View style={styles.oversSection}>
               <Text style={styles.label}>MATCH OVERS</Text>
+              
+              {/* Preset Chips */}
               <View style={styles.oversGrid}>
                 {oversOptions.map((overs) => (
                   <TouchableOpacity
                     key={overs}
                     style={[
                       styles.oversChip,
-                      selectedOvers === overs && styles.oversChipActive,
-                      isCustomInputFocused && styles.oversChipDisabled
+                      selectedOvers === overs && !isCustomMode && styles.oversChipActive,
                     ]}
                     onPress={() => handleOversSelect(overs)}
-                    disabled={isCustomInputFocused}
                     activeOpacity={0.8}
                   >
                     <Text style={[
                       styles.oversChipText,
-                      selectedOvers === overs && styles.oversChipTextActive
+                      selectedOvers === overs && !isCustomMode && styles.oversChipTextActive
                     ]}>
                       {overs}
                     </Text>
                     <Text style={[
                       styles.oversChipSubtext,
-                      selectedOvers === overs && styles.oversChipSubtextActive
+                      selectedOvers === overs && !isCustomMode && styles.oversChipSubtextActive
                     ]}>
                       overs
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
-              
-              <View style={styles.customOversContainer}>
-                <Text style={styles.customLabel}>Custom:</Text>
-                <TextInput
-                  style={styles.customInput}
-                  value={maxOvers}
-                  onChangeText={setMaxOvers}
-                  keyboardType="numeric"
-                  maxLength={3}
-                  selectionColor="#10b981"
-                  onFocus={handleCustomInputFocus}
-                  onBlur={handleCustomInputBlur}
-                />
+
+              {/* Compact Custom Section with Wheel Picker */}
+              <View style={styles.customSection}>
+                <TouchableOpacity 
+                  style={[
+                    styles.customToggle,
+                    isCustomMode && styles.customToggleActive
+                  ]}
+                  onPress={handleCustomSelect}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[
+                    styles.customToggleText,
+                    isCustomMode && styles.customToggleTextActive
+                  ]}>
+                    Custom
+                  </Text>
+                </TouchableOpacity>
+
+                {isCustomMode && (
+  <View style={styles.stepperContainer}>
+    <TouchableOpacity 
+      style={styles.stepperButton}
+      onPress={() => {
+        const currentValue = parseInt(maxOvers, 10) || 1;
+        setMaxOvers(Math.max(1, currentValue - 1).toString());
+      }}
+    >
+      <Text style={styles.stepperText}>−</Text>
+    </TouchableOpacity>
+    
+    <View style={styles.stepperValue}>
+      <Text style={styles.stepperValueText}>{maxOvers}</Text>
+    </View>
+    
+    <TouchableOpacity 
+      style={styles.stepperButton}
+      onPress={() => {
+        const currentValue = parseInt(maxOvers, 10) || 1;
+        setMaxOvers(Math.min(100, currentValue + 1).toString());
+      }}
+    >
+      <Text style={styles.stepperText}>+</Text>
+    </TouchableOpacity>
+  </View>
+)}
               </View>
             </View>
           </View>
@@ -171,6 +227,43 @@ const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({ navigation }) => 
 };
 
 const styles = StyleSheet.create({
+  stepperContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginLeft: 12,
+  flex: 1,
+},
+stepperButton: {
+  width: 44,
+  height: 44,
+  borderRadius: 12,
+  backgroundColor: 'rgba(16, 185, 129, 0.2)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  borderWidth: 1,
+  borderColor: '#10b981',
+},
+stepperText: {
+  fontSize: 24,
+  fontWeight: '700',
+  color: '#10b981',
+},
+stepperValue: {
+  minWidth: 60,
+  height: 50,
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginHorizontal: 12,
+  backgroundColor: 'rgba(0,0,0,0.3)',
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.1)',
+},
+stepperValueText: {
+  fontSize: 24,
+  fontWeight: '700',
+  color: '#ffffff',
+},
   container: {
     flex: 1,
     backgroundColor: '#0f172a',
@@ -183,31 +276,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 60,
     paddingBottom: 40,
-  },
-  iconContainer: {
-    marginBottom: 20,
-  },
-  cricketIcon: {
-    width: 80,
-    height: 80,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  ballOuter: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#10b981',
-  },
-  ballInner: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#10b981',
   },
   title: {
     fontSize: 36,
@@ -267,7 +335,7 @@ const styles = StyleSheet.create({
   oversGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   oversChip: {
     width: '22%',
@@ -296,10 +364,6 @@ const styles = StyleSheet.create({
   oversChipTextActive: {
     color: '#ffffff',
   },
-  oversChipDisabled: {
-    opacity: 0.4,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-  },
   oversChipSubtext: {
     fontSize: 10,
     color: '#64748b',
@@ -310,28 +374,105 @@ const styles = StyleSheet.create({
   oversChipSubtextActive: {
     color: 'rgba(255, 255, 255, 0.8)',
   },
-  customOversContainer: {
+  
+  // Improved Custom Section Styles
+  customSection: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
+    minHeight: 60,
   },
-  customLabel: {
+  customToggle: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  customToggleActive: {
+    backgroundColor: '#10b981',
+    borderColor: '#10b981',
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  customToggleText: {
     fontSize: 14,
-    color: '#64748b',
-    marginRight: 12,
+    fontWeight: '600',
+    color: '#94a3b8',
   },
-  customInput: {
+  customToggleTextActive: {
+    color: '#ffffff',
+    fontWeight: '700',
+  },
+  wheelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 12,
     flex: 1,
+    height: 100,
+  },
+  wheelWrapper: {
+    height: 100,
+    width: 70,
+    position: 'relative',
+    overflow: 'hidden',
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+  },
+  wheelItem: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: 40,
+  },
+  wheelActiveItem: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    borderRadius: 8,
+  },
+  wheelItemText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#ffffff',
-    textAlign: 'right',
+    color: '#64748b',
   },
+  wheelActiveItemText: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  // Gradient fades for smooth wheel appearance
+  wheelTopFade: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 30,
+    backgroundColor: Platform.OS === 'ios' ? 'rgba(15, 23, 42, 0.8)' : 'rgba(15, 23, 42, 0.9)',
+  },
+  wheelBottomFade: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 30,
+    backgroundColor: Platform.OS === 'ios' ? 'rgba(15, 23, 42, 0.8)' : 'rgba(15, 23, 42, 0.9)',
+  },
+  wheelLabel: {
+    fontSize: 14,
+    color: '#94a3b8',
+    marginLeft: 12,
+    fontWeight: '500',
+  },
+
   buttonContainer: {
     marginTop: 32,
     gap: 16,

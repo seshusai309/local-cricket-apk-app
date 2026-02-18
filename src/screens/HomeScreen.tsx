@@ -83,7 +83,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         <View style={styles.header}>
           <View style={styles.logoContainer}>
           </View>
-          <Text style={styles.title}>Seshu Cricket</Text>
+          <Text style={styles.title}>Cricket</Text>
           <Text style={styles.subtitle}>Professional Local Scoring</Text>
         </View>
 
@@ -179,6 +179,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <View style={styles.offlineDot} />
             <Text style={styles.footerText}>Fully Offline</Text>
           </View>
+          <Text style={styles.credits}>Built by Sai Sesha Reddy</Text>
           <Text style={styles.version}>v2.0</Text>
         </View>
       </Animated.View>
@@ -400,10 +401,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.5,
   },
+  credits: {
+    fontSize: 14,
+    color: '#ffffff',
+    marginTop: 8,
+    fontWeight: 'bold',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
   version: {
     fontSize: 12,
     color: '#475569',
-    marginTop: 12,
+    marginTop: 4,
   },
 });
 
