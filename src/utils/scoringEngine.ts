@@ -1,13 +1,13 @@
 import { Match, Ball, Over, Player } from "../types";
 
 export interface ScoringAction {
-  type: "run" | "wicket" | "wide" | "noball" | "dot" | "undo";
+  type: "run" | "wicket" | "wide" | "noball" | "1stbounce" | "dot" | "undo";
   value?: number;
 }
 
 /**
  * Cricket Scoring Engine - Fixed Version
- * 
+ *
  * Key Rules:
  * - An over consists of 6 legal deliveries
  * - Wide and no-ball are extras that don't count toward the 6-ball tally
@@ -25,7 +25,9 @@ export class ScoringEngine {
       case "wide":
         return this.handleWide(updatedMatch);
       case "noball":
-        return this.handleNoBall(updatedMatch);
+        return this.handleNoBall(updatedMatch, action.value);
+      case "1stbounce":
+        return this.handle1stBounce(updatedMatch, action.value);
       case "dot":
         return this.handleDot(updatedMatch);
       case "undo":
@@ -89,6 +91,7 @@ export class ScoringEngine {
       isWicket: false,
       isWide: false,
       isNoBall: false,
+      is1stBounce: false,
       isDot: false,
       batsmanId: match.currentStrikerId,
       bowlerId: match.currentBowlerId,
@@ -127,6 +130,7 @@ export class ScoringEngine {
       isWicket: true,
       isWide: false,
       isNoBall: false,
+      is1stBounce: false,
       isDot: false,
       batsmanId: match.currentStrikerId,
       bowlerId: match.currentBowlerId,
@@ -136,63 +140,122 @@ export class ScoringEngine {
   }
 
   private static handleWide(match: Match): Match {
-  match.totalRuns += 1;
-  match.extras += 1;
+    match.totalRuns += 1;
+    match.extras += 1;
 
-  const bowler = match.players.find((p) => p.id === match.currentBowlerId);
-  if (bowler) {
-    bowler.runsConceded += 1;
+    const bowler = match.players.find((p) => p.id === match.currentBowlerId);
+    if (bowler) {
+      bowler.runsConceded += 1;
+    }
+
+    // Extras belong to the CURRENT over (same over as the next legal ball)
+    // Don't add +1 or clamp — just use match.balls directly to get the current over
+    const currentOverNum = this.getCurrentOverNumber(match.balls + 1); // +1 because balls is 0-indexed pre-increment
+    const displayBallNum = this.getBallNumberInOver(match.balls + 1);
+
+    this.addBallToOver(match, {
+      id: `ball_${Date.now()}`,
+      overNumber: currentOverNum,
+      ballNumber: displayBallNum,
+      runs: 1,
+      isWicket: false,
+      isWide: true,
+      isNoBall: false,
+      is1stBounce: false,
+      isDot: false,
+      batsmanId: match.currentStrikerId,
+      bowlerId: match.currentBowlerId,
+    });
+
+    return match;
   }
 
-  // Extras belong to the CURRENT over (same over as the next legal ball)
-  // Don't add +1 or clamp — just use match.balls directly to get the current over
-  const currentOverNum = this.getCurrentOverNumber(match.balls + 1); // +1 because balls is 0-indexed pre-increment
-  const displayBallNum = this.getBallNumberInOver(match.balls + 1);
+  private static handleNoBall(match: Match, runs: number = 1): Match {
+    // Add the no-ball extra (1 run) + any runs scored off the bat
+    match.totalRuns += runs;
+    match.extras += 1;
 
-  this.addBallToOver(match, {
-    id: `ball_${Date.now()}`,
-    overNumber: currentOverNum,
-    ballNumber: displayBallNum,
-    runs: 1,
-    isWicket: false,
-    isWide: true,
-    isNoBall: false,
-    isDot: false,
-    batsmanId: match.currentStrikerId,
-    bowlerId: match.currentBowlerId,
-  });
+    // Add runs to batsman if they scored off the bat
+    if (runs > 0) {
+      const striker = match.players.find(
+        (p) => p.id === match.currentStrikerId,
+      );
+      if (striker) {
+        striker.runs += runs;
+        striker.balls += 1;
+      }
+    }
 
-  return match;
-}
+    const bowler = match.players.find((p) => p.id === match.currentBowlerId);
+    if (bowler) {
+      bowler.runsConceded += 1 + runs;
+    }
 
-private static handleNoBall(match: Match): Match {
-  match.totalRuns += 1;
-  match.extras += 1;
+    // Same logic as wide
+    const currentOverNum = this.getCurrentOverNumber(match.balls + 1);
+    const displayBallNum = this.getBallNumberInOver(match.balls + 1);
 
-  const bowler = match.players.find((p) => p.id === match.currentBowlerId);
-  if (bowler) {
-    bowler.runsConceded += 1;
+    this.addBallToOver(match, {
+      id: `ball_${Date.now()}`,
+      overNumber: currentOverNum,
+      ballNumber: displayBallNum,
+      runs: 1 + runs, // Total runs for this ball (1 for no-ball + runs off bat)
+      isWicket: false,
+      isWide: false,
+      isNoBall: true,
+      is1stBounce: false,
+      isDot: false,
+      batsmanId: match.currentStrikerId,
+      bowlerId: match.currentBowlerId,
+    });
+
+    return match;
   }
 
-  // Same logic as wide
-  const currentOverNum = this.getCurrentOverNumber(match.balls + 1);
-  const displayBallNum = this.getBallNumberInOver(match.balls + 1);
+  private static handle1stBounce(match: Match, runs: number = 0): Match {
+    // 1st Bounce is a legal ball - counts toward the 6-ball over
+    // Add the runs scored off the bat (no automatic extra)
+    match.totalRuns += runs;
 
-  this.addBallToOver(match, {
-    id: `ball_${Date.now()}`,
-    overNumber: currentOverNum,
-    ballNumber: displayBallNum,
-    runs: 1,
-    isWicket: false,
-    isWide: false,
-    isNoBall: true,
-    isDot: false,
-    batsmanId: match.currentStrikerId,
-    bowlerId: match.currentBowlerId,
-  });
+    // Add runs to batsman
+    const striker = match.players.find((p) => p.id === match.currentStrikerId);
+    if (striker) {
+      striker.runs += runs;
+      striker.balls += 1;
+    }
 
-  return match;
-}
+    // Update bowler stats
+    const bowler = match.players.find((p) => p.id === match.currentBowlerId);
+    if (bowler) {
+      bowler.runsConceded += runs;
+    }
+
+    // Increment legal ball count (counts toward the 6-ball over)
+    match.balls += 1;
+    match.overs = Math.floor(match.balls / 6);
+
+    // Handle strike rotation
+    if (runs % 2 === 1 || match.balls % 6 === 0) {
+      this.rotateStrike(match);
+    }
+
+    // Add ball to current over
+    this.addBallToOver(match, {
+      id: `ball_${Date.now()}`,
+      overNumber: this.getCurrentOverNumber(match.balls),
+      ballNumber: this.getBallNumberInOver(match.balls),
+      runs,
+      isWicket: false,
+      isWide: false,
+      isNoBall: false,
+      is1stBounce: true,
+      isDot: false,
+      batsmanId: match.currentStrikerId,
+      bowlerId: match.currentBowlerId,
+    });
+
+    return match;
+  }
 
   private static handleDot(match: Match): Match {
     const striker = match.players.find((p) => p.id === match.currentStrikerId);
@@ -215,6 +278,7 @@ private static handleNoBall(match: Match): Match {
       isWicket: false,
       isWide: false,
       isNoBall: false,
+      is1stBounce: false,
       isDot: true,
       batsmanId: match.currentStrikerId,
       bowlerId: match.currentBowlerId,
@@ -239,6 +303,26 @@ private static handleNoBall(match: Match): Match {
       const bowler = match.players.find((p) => p.id === lastBall.bowlerId);
       if (bowler) {
         bowler.runsConceded = Math.max(0, bowler.runsConceded - lastBall.runs);
+      }
+    } else if (lastBall.is1stBounce) {
+      // 1st Bounce is a legal ball
+      match.totalRuns = Math.max(0, match.totalRuns - lastBall.runs);
+      match.balls = Math.max(0, match.balls - 1);
+      match.overs = Math.floor(match.balls / 6);
+
+      const batsman = match.players.find((p) => p.id === lastBall.batsmanId);
+      if (batsman) {
+        batsman.runs = Math.max(0, batsman.runs - lastBall.runs);
+        batsman.balls = Math.max(0, batsman.balls - 1);
+      }
+
+      const bowler = match.players.find((p) => p.id === lastBall.bowlerId);
+      if (bowler) {
+        bowler.runsConceded = Math.max(0, bowler.runsConceded - lastBall.runs);
+      }
+
+      if (lastBall.runs % 2 === 1 || lastBall.ballNumber === 6) {
+        this.rotateStrike(match);
       }
     } else {
       // Legal ball
@@ -274,11 +358,11 @@ private static handleNoBall(match: Match): Match {
 
     lastOver.totalRuns = Math.max(
       0,
-      lastOver.balls.reduce((sum, ball) => sum + ball.runs, 0)
+      lastOver.balls.reduce((sum, ball) => sum + ball.runs, 0),
     );
     lastOver.wickets = lastOver.balls.filter((ball) => ball.isWicket).length;
     lastOver.extras = lastOver.balls.filter(
-      (ball) => ball.isWide || ball.isNoBall
+      (ball) => ball.isWide || ball.isNoBall,
     ).length;
 
     if (lastOver.balls.length === 0) {
@@ -292,7 +376,7 @@ private static handleNoBall(match: Match): Match {
     const currentOverNumber = ball.overNumber;
 
     let currentOver = match.oversList.find(
-      (over) => over.overNumber === currentOverNumber
+      (over) => over.overNumber === currentOverNumber,
     );
 
     if (!currentOver) {
@@ -311,11 +395,11 @@ private static handleNoBall(match: Match): Match {
 
     currentOver.totalRuns = Math.max(
       0,
-      currentOver.balls.reduce((sum, b) => sum + b.runs, 0)
+      currentOver.balls.reduce((sum, b) => sum + b.runs, 0),
     );
     currentOver.wickets = currentOver.balls.filter((b) => b.isWicket).length;
     currentOver.extras = currentOver.balls.filter(
-      (b) => b.isWide || b.isNoBall
+      (b) => b.isWide || b.isNoBall,
     ).length;
   }
 
@@ -332,13 +416,13 @@ private static handleNoBall(match: Match): Match {
 
   private static nextBatsman(match: Match): void {
     const availableBatsmen = match.players.filter(
-      (p) => p.type === "batsman" && !p.isStriker && !p.isNonStriker
+      (p) => p.type === "batsman" && !p.isStriker && !p.isNonStriker,
     );
 
     if (availableBatsmen.length > 0) {
       const nextBatsman = availableBatsmen[0];
       const outBatsman = match.players.find(
-        (p) => p.id === match.currentStrikerId
+        (p) => p.id === match.currentStrikerId,
       );
 
       if (outBatsman) {
@@ -356,12 +440,14 @@ private static handleNoBall(match: Match): Match {
       .map((ball) => {
         if (ball.isWicket) return "W";
         if (ball.isDot) return "0";
+        if (ball.is1stBounce) return "b" + ball.runs;
         return ball.runs.toString();
       })
       .join(" ");
   }
 
   static getBallColor(ball: Ball): string {
+    if (ball.is1stBounce) return "#7c3aed"; // Purple for 1st Bounce
     if (ball.runs === 6) return "#10b981"; // Green
     if (ball.runs === 4) return "#3b82f6"; // Blue
     if (ball.isWicket) return "#ef4444"; // Red

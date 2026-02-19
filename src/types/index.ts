@@ -1,7 +1,7 @@
 export interface Player {
   id: string;
   name: string;
-  type: 'batsman' | 'bowler';
+  type: "batsman" | "bowler";
   runs: number;
   balls: number;
   wickets: number;
@@ -20,6 +20,7 @@ export interface Ball {
   isWicket: boolean;
   isWide: boolean;
   isNoBall: boolean;
+  is1stBounce: boolean;
   isDot: boolean;
   batsmanId: string;
   bowlerId: string;

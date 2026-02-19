@@ -13,6 +13,7 @@ export const convertFromDB = (obj: any): any => {
     "isWicket",
     "isWide",
     "isNoBall",
+    "is1stBounce",
     "isDot",
   ];
 
@@ -32,7 +33,14 @@ export const convertFromDB = (obj: any): any => {
   });
 
   // Ensure numeric fields are numbers
-  const numberFields = ["maxOvers", "totalRuns", "wickets", "overs", "balls", "extras"];
+  const numberFields = [
+    "maxOvers",
+    "totalRuns",
+    "wickets",
+    "overs",
+    "balls",
+    "extras",
+  ];
   numberFields.forEach((field) => {
     if (field in converted && typeof converted[field] === "string") {
       converted[field] = parseInt(converted[field], 10) || 0;

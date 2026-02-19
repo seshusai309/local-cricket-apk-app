@@ -83,6 +83,7 @@ export class DatabaseService {
         isWicket INTEGER DEFAULT 0,
         isWide INTEGER DEFAULT 0,
         isNoBall INTEGER DEFAULT 0,
+        is1stBounce INTEGER DEFAULT 0,
         isDot INTEGER DEFAULT 0,
         batsmanId TEXT NOT NULL,
         bowlerId TEXT NOT NULL,
@@ -164,8 +165,8 @@ export class DatabaseService {
           await this.db.runAsync(
             `INSERT OR REPLACE INTO balls (
               id, overId, overNumber, ballNumber, runs, isWicket,
-              isWide, isNoBall, isDot, batsmanId, bowlerId
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              isWide, isNoBall, is1stBounce, isDot, batsmanId, bowlerId
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               ball.id,
               over.id,
@@ -175,6 +176,7 @@ export class DatabaseService {
               ball.isWicket ? 1 : 0,
               ball.isWide ? 1 : 0,
               ball.isNoBall ? 1 : 0,
+              ball.is1stBounce ? 1 : 0,
               ball.isDot ? 1 : 0,
               ball.batsmanId,
               ball.bowlerId,
@@ -234,6 +236,7 @@ export class DatabaseService {
               isWicket: Boolean(ball.isWicket),
               isWide: Boolean(ball.isWide),
               isNoBall: Boolean(ball.isNoBall),
+              is1stBounce: Boolean(ball.is1stBounce),
               isDot: Boolean(ball.isDot),
               batsmanId: ball.batsmanId,
               bowlerId: ball.bowlerId,
