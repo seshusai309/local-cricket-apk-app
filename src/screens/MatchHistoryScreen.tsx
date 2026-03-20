@@ -1,18 +1,27 @@
-// MatchHistoryScreen.tsx
-import React, { useRef } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
-  TouchableOpacity, 
+import React from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
   Alert,
-  Animated,
-  Dimensions 
+  Platform,
 } from 'react-native';
 import { useMatchStore } from '../store/matchStore';
 
-const { width } = Dimensions.get('window');
+const R = {
+  bg: '#1B3A2F',
+  bgCard: '#1E4034',
+  bgCardAlt: '#1A3830',
+  text: '#F5F5DC',
+  textMuted: '#8FAF99',
+  accent: '#D4A017',
+  teal: '#00897B',
+  border: '#2E5040',
+  red: '#C62828',
+  mono: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+};
 
 interface MatchHistoryScreenProps {
   navigation: any;
@@ -20,135 +29,98 @@ interface MatchHistoryScreenProps {
 
 const MatchHistoryScreen: React.FC<MatchHistoryScreenProps> = ({ navigation }) => {
   const { matches, deleteMatch } = useMatchStore();
-  const scrollY = useRef(new Animated.Value(0)).current;
-
-  const completedMatches = matches.filter(match => match.isCompleted);
+  const completedMatches = matches.filter(m => m.isCompleted);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      day: 'numeric',
-      month: 'short',
-    });
+    return date.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: '2-digit' });
   };
 
-  const handleDeleteMatch = (matchId: string, teamName: string) => {
-    Alert.alert(
-      'Delete Match',
-      `Delete "${teamName}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: () => deleteMatch(matchId)
-        }
-      ]
-    );
-  };
-
-  const navigateToMatchDetail = (match: any) => {
-    navigation.navigate('MatchDetail', { match });
+  const handleDelete = (matchId: string, teamName: string) => {
+    Alert.alert('Delete Match', `Delete "${teamName}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteMatch(matchId) },
+    ]);
   };
 
   const renderMatch = ({ item, index }: { item: any; index: number }) => {
     const oversDisplay = `${item.overs}.${item.balls % 6}`;
-    const inputRange = [
-      -1, 
-      0, 
-      120 * index, 
-      120 * (index + 2)
-    ];
-    const scale = scrollY.interpolate({
-      inputRange,
-      outputRange: [1, 1, 1, 0.95],
-    });
-    const opacity = scrollY.interpolate({
-      inputRange,
-      outputRange: [1, 1, 1, 0.5],
-    });
+    const rr = item.overs > 0 || item.balls % 6 > 0
+      ? (item.totalRuns / (item.balls / 6)).toFixed(1)
+      : '0.0';
+    const isEven = index % 2 === 0;
 
     return (
-      <Animated.View style={{ transform: [{ scale }], opacity }}>
-        <TouchableOpacity 
-          style={styles.matchCard}
-          onPress={() => navigateToMatchDetail(item)}
-          activeOpacity={0.9}
-        >
-          <View style={styles.cardHeader}>
-            <View style={styles.teamSection}>
-              <View style={styles.teamAvatar}>
-                <Text style={styles.teamAvatarText}>
-                  {item.teamName.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-              <View>
-                <Text style={styles.teamName} numberOfLines={1}>
-                  {item.teamName}
-                </Text>
-                <Text style={styles.matchDate}>{formatDate(item.createdAt)}</Text>
-              </View>
-            </View>
-            <View style={styles.scoreBadge}>
-              <Text style={styles.scoreText}>{item.totalRuns}/{item.wickets}</Text>
-              <Text style={styles.oversText}>{oversDisplay}</Text>
-            </View>
+      <TouchableOpacity
+        style={[styles.card, isEven ? styles.cardA : styles.cardB]}
+        onPress={() => navigation.navigate('MatchDetail', { match: item })}
+        activeOpacity={0.85}
+      >
+        {/* Top row */}
+        <View style={styles.cardTop}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{item.teamName.charAt(0).toUpperCase()}</Text>
           </View>
+          <View style={styles.cardInfo}>
+            <Text style={styles.cardTeam} numberOfLines={1}>{item.teamName}</Text>
+            <Text style={styles.cardDate}>{formatDate(item.createdAt)}</Text>
+          </View>
+          <View style={styles.scoreBadge}>
+            <Text style={styles.scoreMain}>{item.totalRuns}/{item.wickets}</Text>
+            <Text style={styles.scoreOvers}>{oversDisplay} ov</Text>
+          </View>
+        </View>
 
-          <View style={styles.cardStats}>
-            <View style={styles.stat}>
-              <Text style={styles.statValue}>{oversDisplay}</Text>
-              <Text style={styles.statLabel}>Overs</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.stat}>
-              <Text style={styles.statValue}>{item.balls}</Text>
-              <Text style={styles.statLabel}>Balls</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.stat}>
-              <Text style={styles.statValue}>
-                {item.overs > 0 
-                  ? (item.totalRuns / (item.overs + (item.balls % 6) / 6)).toFixed(1) 
-                  : '0.0'}
-              </Text>
-              <Text style={styles.statLabel}>RR</Text>
-            </View>
+        {/* Stats */}
+        <View style={styles.statsRow}>
+          <View style={styles.stat}>
+            <Text style={styles.statVal}>{rr}</Text>
+            <Text style={styles.statLbl}>RUN RATE</Text>
           </View>
-
-          <View style={styles.cardActions}>
-            <TouchableOpacity 
-              style={styles.deleteAction}
-              onPress={(e) => {
-                e.stopPropagation();
-                handleDeleteMatch(item.id, item.teamName);
-              }}
-            >
-              <Text style={styles.deleteActionText}>Delete</Text>
-            </TouchableOpacity>
-            <View style={styles.viewHint}>
-              <Text style={styles.viewHintText}>View Details</Text>
-              <View style={styles.arrow}>
-                <View style={styles.arrowHead} />
+          <View style={styles.statDiv} />
+          <View style={styles.stat}>
+            <Text style={styles.statVal}>{item.extras ?? 0}</Text>
+            <Text style={styles.statLbl}>EXTRAS</Text>
+          </View>
+          <View style={styles.statDiv} />
+          <View style={styles.stat}>
+            <Text style={styles.statVal}>{item.maxOvers}</Text>
+            <Text style={styles.statLbl}>OVERS</Text>
+          </View>
+          {item.targetScore > 0 && (
+            <>
+              <View style={styles.statDiv} />
+              <View style={styles.stat}>
+                <Text style={[styles.statVal, { color: item.totalRuns >= item.targetScore ? R.teal : R.accent }]}>
+                  {item.targetScore}
+                </Text>
+                <Text style={styles.statLbl}>TARGET</Text>
               </View>
-            </View>
-          </View>
-        </TouchableOpacity>
-      </Animated.View>
+            </>
+          )}
+        </View>
+
+        {/* Actions */}
+        <View style={styles.cardActions}>
+          <TouchableOpacity
+            style={styles.deleteBtn}
+            onPress={(e) => { e.stopPropagation(); handleDelete(item.id, item.teamName); }}
+          >
+            <Text style={styles.deleteBtnText}>Delete</Text>
+          </TouchableOpacity>
+          <Text style={styles.viewHint}>View Details  ›</Text>
+        </View>
+      </TouchableOpacity>
     );
   };
 
   if (completedMatches.length === 0) {
     return (
       <View style={styles.container}>
-        <View style={styles.emptyContainer}>
-          <View style={styles.emptyIcon}>
-            <Text style={styles.emptyIconText}>📋</Text>
-          </View>
-          <Text style={styles.emptyTitle}>No History Yet</Text>
-          <Text style={styles.emptySubtitle}>
-            Complete a match to see it here
-          </Text>
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyEmoji}>📋</Text>
+          <Text style={styles.emptyTitle}>NO HISTORY YET</Text>
+          <Text style={styles.emptySub}>Complete a match to see it here</Text>
         </View>
       </View>
     );
@@ -156,16 +128,12 @@ const MatchHistoryScreen: React.FC<MatchHistoryScreenProps> = ({ navigation }) =
 
   return (
     <View style={styles.container}>
-      <Animated.FlatList
+      <FlatList
         data={completedMatches}
         renderItem={renderMatch}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true }
-        )}
       />
     </View>
   );
@@ -174,187 +142,148 @@ const MatchHistoryScreen: React.FC<MatchHistoryScreenProps> = ({ navigation }) =
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: R.bg,
   },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-    backgroundColor: '#1e293b',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+  list: {
+    padding: 14,
+    gap: 10,
   },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#64748b',
-  },
-  listContent: {
+
+  // Card
+  card: {
+    borderRadius: 16,
     padding: 16,
-    gap: 12,
-  },
-  matchCard: {
-    backgroundColor: '#1e293b',
-    borderRadius: 20,
-    padding: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: R.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 5,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  teamSection: {
+  cardA: { backgroundColor: R.bgCard },
+  cardB: { backgroundColor: R.bgCardAlt },
+
+  cardTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
+    marginBottom: 12,
   },
-  teamAvatar: {
-    width: 48,
-    height: 48,
+  avatar: {
+    width: 46,
+    height: 46,
     borderRadius: 12,
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    backgroundColor: 'rgba(212,160,23,0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
+    borderColor: 'rgba(212,160,23,0.35)',
   },
-  teamAvatarText: {
+  avatarText: {
     fontSize: 20,
-    fontWeight: '800',
-    color: '#10b981',
+    fontWeight: '900',
+    color: R.accent,
+    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
   },
-  teamName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#ffffff',
-    maxWidth: 150,
-  },
-  matchDate: {
-    fontSize: 13,
-    color: '#64748b',
-    marginTop: 2,
-  },
-  scoreBadge: {
-    alignItems: 'flex-end',
-  },
-  scoreText: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  oversText: {
-    fontSize: 13,
-    color: '#64748b',
-    marginTop: 2,
-  },
-  cardStats: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-  },
-  stat: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  statValue: {
+  cardInfo: { flex: 1 },
+  cardTeam: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 2,
+    fontWeight: '800',
+    color: R.text,
+    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+    marginBottom: 3,
   },
-  statLabel: {
+  cardDate: {
+    fontSize: 12,
+    color: R.textMuted,
+    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+  },
+  scoreBadge: { alignItems: 'flex-end' },
+  scoreMain: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: R.accent,
+    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+  },
+  scoreOvers: {
     fontSize: 11,
-    color: '#64748b',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    color: R.textMuted,
+    marginTop: 2,
+    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
   },
+
+  // Stats
+  statsRow: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: R.border,
+  },
+  stat: { flex: 1, alignItems: 'center' },
+  statDiv: { width: 1, backgroundColor: R.border },
+  statVal: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: R.text,
+    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+  },
+  statLbl: {
+    fontSize: 8,
+    color: R.textMuted,
+    letterSpacing: 0.8,
+    marginTop: 2,
+    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+  },
+
+  // Actions
   cardActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  deleteAction: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+  deleteBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
     borderRadius: 8,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    backgroundColor: 'rgba(198,40,40,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(198,40,40,0.25)',
   },
-  deleteActionText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#ef4444',
+  deleteBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: R.red,
+    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
   },
   viewHint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  viewHintText: {
     fontSize: 13,
-    color: '#64748b',
-    fontWeight: '600',
-    marginRight: 8,
+    color: R.textMuted,
+    fontWeight: '700',
+    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
   },
-  arrow: {
-    width: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  arrowHead: {
-    width: 6,
-    height: 6,
-    borderTopWidth: 2,
-    borderRightWidth: 2,
-    borderColor: '#64748b',
-    transform: [{ rotate: '45deg' }],
-  },
-  emptyContainer: {
+
+  // Empty
+  emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 40,
+    gap: 12,
   },
-  emptyIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  emptyIconText: {
-    fontSize: 32,
-  },
+  emptyEmoji: { fontSize: 48 },
   emptyTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#ffffff',
-    marginBottom: 8,
+    fontSize: 20,
+    fontWeight: '900',
+    color: R.accent,
+    letterSpacing: 2,
+    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
   },
-  emptySubtitle: {
-    fontSize: 16,
-    color: '#64748b',
+  emptySub: {
+    fontSize: 14,
+    color: R.textMuted,
     textAlign: 'center',
   },
 });

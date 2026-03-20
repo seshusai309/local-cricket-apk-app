@@ -11,6 +11,7 @@ export class DatabaseService {
     try {
       this.db = await SQLite.openDatabaseAsync(DB_NAME);
       await this.createTables();
+      await this.runMigrations();
     } catch (error) {
       console.error("Database initialization error:", error);
       throw error;
@@ -20,12 +21,12 @@ export class DatabaseService {
   private async createTables() {
     if (!this.db) throw new Error("Database not initialized");
 
-    // Create matches table (removed DROP TABLE to preserve data)
     await this.db.execAsync(`
       CREATE TABLE IF NOT EXISTS matches (
         id TEXT PRIMARY KEY,
         teamName TEXT NOT NULL,
         maxOvers INTEGER DEFAULT 20,
+        targetScore INTEGER DEFAULT 0,
         totalRuns INTEGER DEFAULT 0,
         wickets INTEGER DEFAULT 0,
         overs INTEGER DEFAULT 0,
@@ -40,7 +41,6 @@ export class DatabaseService {
       );
     `);
 
-    // Create players table
     await this.db.execAsync(`
       CREATE TABLE IF NOT EXISTS players (
         id TEXT PRIMARY KEY,
@@ -59,7 +59,6 @@ export class DatabaseService {
       );
     `);
 
-    // Create overs table
     await this.db.execAsync(`
       CREATE TABLE IF NOT EXISTS overs (
         id TEXT PRIMARY KEY,
@@ -72,7 +71,6 @@ export class DatabaseService {
       );
     `);
 
-    // Create balls table
     await this.db.execAsync(`
       CREATE TABLE IF NOT EXISTS balls (
         id TEXT PRIMARY KEY,
@@ -92,21 +90,45 @@ export class DatabaseService {
     `);
   }
 
+  // Safe migrations — each ALTER TABLE is wrapped in try-catch so
+  // if the column already exists the error is silently ignored.
+  private async runMigrations() {
+    if (!this.db) return;
+
+    const migrations = [
+      `ALTER TABLE matches ADD COLUMN targetScore INTEGER DEFAULT 0`,
+      `ALTER TABLE balls ADD COLUMN is1stBounce INTEGER DEFAULT 0`,
+      `ALTER TABLE balls ADD COLUMN isDot INTEGER DEFAULT 0`,
+      `ALTER TABLE balls ADD COLUMN overNumber INTEGER DEFAULT 0`,
+      `ALTER TABLE balls ADD COLUMN ballNumber INTEGER DEFAULT 0`,
+      `ALTER TABLE balls ADD COLUMN batsmanId TEXT DEFAULT ''`,
+      `ALTER TABLE balls ADD COLUMN bowlerId TEXT DEFAULT ''`,
+    ];
+
+    for (const sql of migrations) {
+      try {
+        await this.db.execAsync(sql);
+      } catch {
+        // Column already exists — safe to ignore
+      }
+    }
+  }
+
   async saveMatch(match: Match): Promise<void> {
     if (!this.db) throw new Error("Database not initialized");
 
     try {
-      // Save match
       await this.db.runAsync(
         `INSERT OR REPLACE INTO matches (
-          id, teamName, maxOvers, totalRuns, wickets, overs, balls, extras,
+          id, teamName, maxOvers, targetScore, totalRuns, wickets, overs, balls, extras,
           currentStrikerId, currentNonStrikerId, currentBowlerId,
           isCompleted, createdAt, completedAt
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           match.id,
           match.teamName,
           match.maxOvers,
+          match.targetScore ?? 0,
           match.totalRuns,
           match.wickets,
           match.overs,
@@ -121,7 +143,6 @@ export class DatabaseService {
         ],
       );
 
-      // Save players
       for (const player of match.players) {
         await this.db.runAsync(
           `INSERT OR REPLACE INTO players (
@@ -129,15 +150,9 @@ export class DatabaseService {
             runsConceded, oversBowled, isStriker, isNonStriker, isBowling
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            player.id,
-            match.id,
-            player.name,
-            player.type,
-            player.runs,
-            player.balls,
-            player.wickets,
-            player.runsConceded,
-            player.oversBowled,
+            player.id, match.id, player.name, player.type,
+            player.runs, player.balls, player.wickets,
+            player.runsConceded, player.oversBowled,
             player.isStriker ? 1 : 0,
             player.isNonStriker ? 1 : 0,
             player.isBowling ? 1 : 0,
@@ -145,20 +160,11 @@ export class DatabaseService {
         );
       }
 
-      // Save overs and balls
       for (const over of match.oversList) {
         await this.db.runAsync(
-          `INSERT OR REPLACE INTO overs (
-            id, matchId, overNumber, totalRuns, wickets, extras
-          ) VALUES (?, ?, ?, ?, ?, ?)`,
-          [
-            over.id,
-            match.id,
-            over.overNumber,
-            over.totalRuns,
-            over.wickets,
-            over.extras,
-          ],
+          `INSERT OR REPLACE INTO overs (id, matchId, overNumber, totalRuns, wickets, extras)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [over.id, match.id, over.overNumber, over.totalRuns, over.wickets, over.extras],
         );
 
         for (const ball of over.balls) {
@@ -168,18 +174,14 @@ export class DatabaseService {
               isWide, isNoBall, is1stBounce, isDot, batsmanId, bowlerId
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-              ball.id,
-              over.id,
-              ball.overNumber,
-              ball.ballNumber,
-              ball.runs,
+              ball.id, over.id,
+              ball.overNumber, ball.ballNumber, ball.runs,
               ball.isWicket ? 1 : 0,
               ball.isWide ? 1 : 0,
               ball.isNoBall ? 1 : 0,
               ball.is1stBounce ? 1 : 0,
               ball.isDot ? 1 : 0,
-              ball.batsmanId,
-              ball.bowlerId,
+              ball.batsmanId, ball.bowlerId,
             ],
           );
         }
@@ -194,24 +196,20 @@ export class DatabaseService {
     if (!this.db) throw new Error("Database not initialized");
 
     try {
-      const matches = (await this.db.getAllAsync(`
-        SELECT * FROM matches ORDER BY createdAt DESC
-      `)) as any[];
+      const matches = (await this.db.getAllAsync(
+        `SELECT * FROM matches ORDER BY createdAt DESC`
+      )) as any[];
 
       const result: Match[] = [];
 
       for (const matchRow of matches) {
         const players = (await this.db.getAllAsync(
-          `
-          SELECT * FROM players WHERE matchId = ? ORDER BY id
-        `,
+          `SELECT * FROM players WHERE matchId = ? ORDER BY id`,
           [matchRow.id],
         )) as any[];
 
         const overs = (await this.db.getAllAsync(
-          `
-          SELECT * FROM overs WHERE matchId = ? ORDER BY overNumber
-        `,
+          `SELECT * FROM overs WHERE matchId = ? ORDER BY overNumber`,
           [matchRow.id],
         )) as any[];
 
@@ -219,9 +217,7 @@ export class DatabaseService {
 
         for (const overRow of overs) {
           const balls = (await this.db.getAllAsync(
-            `
-            SELECT * FROM balls WHERE overId = ? ORDER BY ballNumber
-          `,
+            `SELECT * FROM balls WHERE overId = ? ORDER BY ballNumber`,
             [overRow.id],
           )) as any[];
 
@@ -230,16 +226,16 @@ export class DatabaseService {
             overNumber: overRow.overNumber,
             balls: balls.map((ball) => ({
               id: ball.id,
-              overNumber: ball.overNumber,
-              ballNumber: ball.ballNumber,
-              runs: ball.runs,
+              overNumber: ball.overNumber ?? 0,
+              ballNumber: ball.ballNumber ?? 0,
+              runs: ball.runs ?? 0,
               isWicket: Boolean(ball.isWicket),
               isWide: Boolean(ball.isWide),
               isNoBall: Boolean(ball.isNoBall),
               is1stBounce: Boolean(ball.is1stBounce),
               isDot: Boolean(ball.isDot),
-              batsmanId: ball.batsmanId,
-              bowlerId: ball.bowlerId,
+              batsmanId: ball.batsmanId ?? '',
+              bowlerId: ball.bowlerId ?? '',
             })),
             totalRuns: overRow.totalRuns,
             wickets: overRow.wickets,
@@ -252,23 +248,19 @@ export class DatabaseService {
             id: matchRow.id,
             teamName: matchRow.teamName,
             maxOvers: matchRow.maxOvers,
+            targetScore: matchRow.targetScore ?? 0,
             totalRuns: matchRow.totalRuns,
             wickets: matchRow.wickets,
             overs: matchRow.overs,
             balls: matchRow.balls,
             extras: matchRow.extras,
-            players: players.map((player) => ({
-              id: player.id,
-              name: player.name,
-              type: player.type,
-              runs: player.runs,
-              balls: player.balls,
-              wickets: player.wickets,
-              runsConceded: player.runsConceded,
-              oversBowled: player.oversBowled,
-              isStriker: Boolean(player.isStriker),
-              isNonStriker: Boolean(player.isNonStriker),
-              isBowling: Boolean(player.isBowling),
+            players: players.map((p) => ({
+              id: p.id, name: p.name, type: p.type,
+              runs: p.runs, balls: p.balls, wickets: p.wickets,
+              runsConceded: p.runsConceded, oversBowled: p.oversBowled,
+              isStriker: Boolean(p.isStriker),
+              isNonStriker: Boolean(p.isNonStriker),
+              isBowling: Boolean(p.isBowling),
             })),
             oversList,
             currentStrikerId: matchRow.currentStrikerId,
@@ -290,31 +282,18 @@ export class DatabaseService {
 
   async getMatch(id: string): Promise<Match | null> {
     const matches = await this.getMatches();
-    return matches.find((match) => match.id === id) || null;
+    return matches.find((m) => m.id === id) || null;
   }
 
   async deleteMatch(id: string): Promise<void> {
     if (!this.db) throw new Error("Database not initialized");
-
     try {
-      // Delete balls first (foreign key constraint)
       await this.db.runAsync(
-        `
-        DELETE FROM balls WHERE overId IN (
-          SELECT id FROM overs WHERE matchId = ?
-        )
-      `,
-        [id],
+        `DELETE FROM balls WHERE overId IN (SELECT id FROM overs WHERE matchId = ?)`, [id]
       );
-
-      // Delete overs
-      await this.db.runAsync("DELETE FROM overs WHERE matchId = ?", [id]);
-
-      // Delete players
-      await this.db.runAsync("DELETE FROM players WHERE matchId = ?", [id]);
-
-      // Delete match
-      await this.db.runAsync("DELETE FROM matches WHERE id = ?", [id]);
+      await this.db.runAsync(`DELETE FROM overs WHERE matchId = ?`, [id]);
+      await this.db.runAsync(`DELETE FROM players WHERE matchId = ?`, [id]);
+      await this.db.runAsync(`DELETE FROM matches WHERE id = ?`, [id]);
     } catch (error) {
       console.error("Error deleting match:", error);
       throw error;

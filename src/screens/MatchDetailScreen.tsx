@@ -1,4 +1,3 @@
-// MatchDetailScreen.tsx
 import React from 'react';
 import {
   View,
@@ -7,109 +6,86 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Platform,
 } from 'react-native';
 import { useMatchStore } from '../store/matchStore';
-import { ScoringEngine } from '../utils/scoringEngine';
 import BallBox from '../components/BallBox/BallBox';
 import { Match } from '../types';
 
+const R = {
+  bg: '#1B3A2F',
+  bgCard: '#1E4034',
+  bgCardAlt: '#122B22',
+  text: '#F5F5DC',
+  textMuted: '#8FAF99',
+  accent: '#D4A017',
+  teal: '#00897B',
+  border: '#2E5040',
+  red: '#C62828',
+  mono: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+};
+
 interface MatchDetailScreenProps {
   navigation: any;
-  route: {
-    params: {
-      match: Match;
-    };
-  };
+  route: { params: { match: Match } };
 }
 
 const MatchDetailScreen: React.FC<MatchDetailScreenProps> = ({ navigation, route }) => {
   const { match } = route.params;
   const { deleteMatch } = useMatchStore();
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
+  const handleDelete = () => {
+    Alert.alert('Delete Match', `Delete "${match.teamName}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive',
+        onPress: () => { deleteMatch(match.id); navigation.goBack(); },
+      },
+    ]);
   };
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+  const oversDisplay = `${match.overs}.${match.balls % 6}`;
+  const rr = match.balls > 0 ? (match.totalRuns / (match.balls / 6)).toFixed(1) : '0.0';
 
-  const handleDeleteMatch = () => {
-    Alert.alert(
-      'Delete Match',
-      `Are you sure you want to delete "${match.teamName}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            deleteMatch(match.id);
-            navigation.goBack();
-          },
-        },
-      ]
-    );
-  };
+  const totalSixes = match.oversList?.reduce(
+    (acc, over) => acc + over.balls.filter((b: any) => b.runs === 6 && !b.isWide && !b.isNoBall).length, 0
+  ) || 0;
+  const totalFours = match.oversList?.reduce(
+    (acc, over) => acc + over.balls.filter((b: any) => b.runs === 4 && !b.isWide && !b.isNoBall).length, 0
+  ) || 0;
 
-  const renderOverRow = (over: any, index: number) => {
-    // ✅ FIX: Separate legal balls and extras — never mix them
+  const isWon = (match.targetScore ?? 0) > 0 && match.totalRuns >= match.targetScore;
+
+  const renderOver = (over: any, index: number) => {
     const legalBalls = over.balls.filter((b: any) => !b.isWide && !b.isNoBall);
     const extraBalls = over.balls.filter((b: any) => b.isWide || b.isNoBall);
     const emptySlots = Math.max(0, 6 - legalBalls.length);
     const isEven = index % 2 === 0;
 
     return (
-      <View
-        key={`over-${over.overNumber}-${over.id}`}
-        style={[styles.overCard, isEven && styles.overCardAlt]}
-      >
-        {/* Over header */}
+      <View key={`over-${over.overNumber}-${over.id}`} style={[styles.overCard, isEven && styles.overCardAlt]}>
         <View style={styles.overHeader}>
-          <View style={styles.overNumberBadge}>
-            <Text style={styles.overNumberText}>{over.overNumber}</Text>
+          <View style={styles.overNumBadge}>
+            <Text style={styles.overNumText}>{over.overNumber}</Text>
           </View>
-          <View style={styles.overHeaderStats}>
-            <Text style={styles.overHeaderRuns}>{over.totalRuns} runs</Text>
-            {over.wickets > 0 && (
-              <Text style={styles.overHeaderWickets}> · {over.wickets}W</Text>
-            )}
-          </View>
+          <Text style={styles.overRuns}>{over.totalRuns} runs</Text>
+          {over.wickets > 0 && <Text style={styles.overWkts}>· {over.wickets}W</Text>}
         </View>
 
-        {/* 6 legal ball boxes + empty slots */}
         <View style={styles.ballsRow}>
-          {legalBalls.slice(0, 6).map((ball: any, ballIndex: number) => (
-            <BallBox
-              key={`legal-${over.overNumber}-${ballIndex}`}
-              ball={ball}
-              compact
-            />
+          {legalBalls.slice(0, 6).map((ball: any, idx: number) => (
+            <BallBox key={`legal-${over.overNumber}-${idx}`} ball={ball} compact />
           ))}
           {Array.from({ length: emptySlots }).map((_, idx) => (
             <View key={`empty-${over.overNumber}-${idx}`} style={styles.emptyBall} />
           ))}
         </View>
 
-        {/* Extras row — shown separately below, only if any */}
         {extraBalls.length > 0 && (
           <View style={styles.extrasRow}>
             <Text style={styles.extrasLabel}>Extras: </Text>
             {extraBalls.map((ball: any, idx: number) => (
-              <BallBox
-                key={`extra-${over.overNumber}-${idx}`}
-                ball={ball}
-                compact
-              />
+              <BallBox key={`extra-${over.overNumber}-${idx}`} ball={ball} compact />
             ))}
           </View>
         )}
@@ -117,353 +93,287 @@ const MatchDetailScreen: React.FC<MatchDetailScreenProps> = ({ navigation, route
     );
   };
 
-  const oversDisplay = `${match.overs}.${match.balls % 6}`;
-  const totalSixes = match.oversList?.reduce(
-    (acc, over) => acc + over.balls.filter((b: any) => b.runs === 6 && !b.isWide).length,
-    0
-  ) || 0;
-  const totalFours = match.oversList?.reduce(
-    (acc, over) => acc + over.balls.filter((b: any) => b.runs === 4 && !b.isWide).length,
-    0
-  ) || 0;
-
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
 
-      {/* ── Minimal Header Card ── */}
+      {/* ── Score Header ── */}
       <View style={styles.headerCard}>
-
-        {/* Row 1: Team name + COMPLETED badge */}
         <View style={styles.topRow}>
           <Text style={styles.teamName} numberOfLines={1}>{match.teamName}</Text>
-          <View style={styles.completedBadge}>
-            <Text style={styles.completedText}>DONE</Text>
+          <View style={[styles.doneBadge, isWon && styles.wonBadge]}>
+            <Text style={[styles.doneText, isWon && { color: R.teal }]}>
+              {isWon ? 'WON 🏆' : 'DONE'}
+            </Text>
           </View>
         </View>
 
-        {/* Row 2: Score + Overs inline */}
         <View style={styles.scoreRow}>
-          <View style={styles.scoreLeft}>
+          <View style={styles.digitBox}>
             <Text style={styles.runs}>{match.totalRuns}</Text>
-            <Text style={styles.separator}>/</Text>
-            <Text style={styles.wickets}>{match.wickets}</Text>
           </View>
-          <View style={styles.scoreRight}>
+          <Text style={styles.separator}>/</Text>
+          <Text style={styles.wickets}>{match.wickets}</Text>
+          <View style={styles.oversBox}>
             <Text style={styles.oversMain}>{oversDisplay}</Text>
             <Text style={styles.oversOf}>/ {match.maxOvers} ov</Text>
           </View>
         </View>
 
-        {/* Row 3: Compact pill stats — no run rate */}
+        {(match.targetScore ?? 0) > 0 && (
+          <View style={[styles.targetRow, isWon && styles.targetRowWon]}>
+            {isWon
+              ? <Text style={styles.wonText}>🏆 Target {match.targetScore} achieved!</Text>
+              : <Text style={styles.targetText}>Target: {match.targetScore}  ·  Fell short by {match.targetScore - match.totalRuns}</Text>
+            }
+          </View>
+        )}
+
         <View style={styles.pillRow}>
-          <View style={styles.pill}>
-            <Text style={styles.pillValue}>{match.balls}</Text>
-            <Text style={styles.pillLabel}>Balls</Text>
-          </View>
-          <View style={styles.pillDivider} />
-          <View style={styles.pill}>
-            <Text style={styles.pillValue}>{match.extras ?? 0}</Text>
-            <Text style={styles.pillLabel}>Extras</Text>
-          </View>
-          <View style={styles.pillDivider} />
-          <View style={styles.pill}>
-            <Text style={styles.pillValue}>{totalSixes}</Text>
-            <Text style={styles.pillLabel}>Sixes</Text>
-          </View>
-          <View style={styles.pillDivider} />
-          <View style={styles.pill}>
-            <Text style={styles.pillValue}>{totalFours}</Text>
-            <Text style={styles.pillLabel}>Fours</Text>
-          </View>
+          {[
+            { val: rr, lbl: 'RUN RATE' },
+            { val: match.extras ?? 0, lbl: 'EXTRAS' },
+            { val: totalSixes, lbl: 'SIXES' },
+            { val: totalFours, lbl: 'FOURS' },
+          ].map((s, i, arr) => (
+            <React.Fragment key={s.lbl}>
+              <View style={styles.pill}>
+                <Text style={styles.pillVal}>{s.val}</Text>
+                <Text style={styles.pillLbl}>{s.lbl}</Text>
+              </View>
+              {i < arr.length - 1 && <View style={styles.pillDiv} />}
+            </React.Fragment>
+          ))}
         </View>
       </View>
 
-      {/* ── Section divider ── */}
+      {/* ── Over by Over ── */}
       <View style={styles.sectionHeader}>
         <View style={styles.sectionLine} />
-        <Text style={styles.sectionTitle}>Over by Over</Text>
+        <Text style={styles.sectionTitle}>📋 OVER BY OVER</Text>
         <View style={styles.sectionLine} />
       </View>
 
-      {/* ── Overs list ── */}
       <View style={styles.oversList}>
-        {match.oversList && match.oversList.length > 0 ? (
-          match.oversList.map((over, index) => renderOverRow(over, index))
-        ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No over data available</Text>
-          </View>
-        )}
+        {match.oversList && match.oversList.length > 0
+          ? match.oversList.map((over, index) => renderOver(over, index))
+          : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>No over data available</Text>
+            </View>
+          )
+        }
       </View>
 
-      {/* ── Delete button ── */}
-      <TouchableOpacity
-        style={styles.deleteButton}
-        onPress={handleDeleteMatch}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.deleteText}>🗑  Delete Match</Text>
+      <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete} activeOpacity={0.8}>
+        <Text style={styles.deleteBtnText}>🗑  Delete Match</Text>
       </TouchableOpacity>
 
-      <View style={{ height: 32 }} />
+      <View style={{ height: 36 }} />
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0f172a',
-  },
+  container: { flex: 1, backgroundColor: R.bg },
 
-  // ── Header ──
   headerCard: {
-    backgroundColor: '#1e293b',
+    backgroundColor: R.bgCard,
     margin: 12,
     borderRadius: 16,
-    padding: 14,
+    padding: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: R.border,
+    elevation: 6,
   },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   teamName: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#cbd5e1',
+    fontWeight: '800',
+    color: R.textMuted,
     flex: 1,
     marginRight: 8,
+    fontFamily: R.mono,
+    letterSpacing: 1,
   },
-  completedBadge: {
-    backgroundColor: 'rgba(16,185,129,0.12)',
-    paddingHorizontal: 10,
+  doneBadge: {
+    backgroundColor: 'rgba(212,160,23,0.12)',
+    paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(16,185,129,0.3)',
+    borderColor: 'rgba(212,160,23,0.3)',
   },
-  completedText: {
+  wonBadge: {
+    backgroundColor: 'rgba(0,137,123,0.15)',
+    borderColor: 'rgba(0,137,123,0.35)',
+  },
+  doneText: {
     fontSize: 11,
-    fontWeight: '800',
-    color: '#10b981',
+    fontWeight: '900',
+    color: R.accent,
     letterSpacing: 1,
+    fontFamily: R.mono,
   },
   scoreRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    justifyContent: 'space-between',
     marginBottom: 10,
   },
-  scoreLeft: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
+  digitBox: {
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: R.border,
   },
   runs: {
-    fontSize: 52,
-    fontWeight: '800',
-    color: '#ffffff',
+    fontSize: 50,
+    fontWeight: '900',
+    color: R.accent,
+    fontFamily: R.mono,
     letterSpacing: -1,
     lineHeight: 56,
   },
   separator: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: '300',
-    color: '#475569',
-    marginHorizontal: 3,
+    color: R.border,
+    marginHorizontal: 6,
     lineHeight: 56,
   },
   wickets: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#ef4444',
+    fontSize: 30,
+    fontWeight: '900',
+    color: R.red,
     lineHeight: 56,
+    fontFamily: R.mono,
   },
-  scoreRight: {
+  oversBox: {
     alignItems: 'flex-end',
+    marginLeft: 'auto',
     paddingBottom: 4,
   },
   oversMain: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#10b981',
+    fontSize: 20,
+    fontWeight: '900',
+    color: R.teal,
+    fontFamily: R.mono,
   },
-  oversOf: {
-    fontSize: 12,
-    color: '#64748b',
-    marginTop: 1,
+  oversOf: { fontSize: 11, color: R.textMuted, marginTop: 1, fontFamily: R.mono },
+
+  targetRow: {
+    backgroundColor: 'rgba(212,160,23,0.08)',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(212,160,23,0.2)',
   },
+  targetRowWon: {
+    backgroundColor: 'rgba(0,137,123,0.12)',
+    borderColor: 'rgba(0,137,123,0.3)',
+  },
+  targetText: { fontSize: 13, color: R.text, fontFamily: R.mono },
+  wonText: { fontSize: 14, color: R.teal, fontWeight: '900', fontFamily: R.mono },
+
   pillRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.05)',
+    borderTopColor: R.border,
   },
-  pill: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  pillValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  pillLabel: {
-    fontSize: 10,
-    color: '#64748b',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginTop: 1,
-  },
-  pillDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-  },
+  pill: { flex: 1, alignItems: 'center' },
+  pillVal: { fontSize: 14, fontWeight: '900', color: R.text, fontFamily: R.mono },
+  pillLbl: { fontSize: 8, color: R.textMuted, letterSpacing: 0.8, marginTop: 2, fontFamily: R.mono },
+  pillDiv: { width: 1, height: 22, backgroundColor: R.border },
 
-  // ── Section header ──
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    marginVertical: 16,
+    marginVertical: 14,
   },
-  sectionLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
+  sectionLine: { flex: 1, height: 1, backgroundColor: R.border },
   sectionTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748b',
-    marginHorizontal: 14,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+    fontSize: 11,
+    fontWeight: '900',
+    color: R.accent,
+    marginHorizontal: 12,
+    letterSpacing: 1.5,
+    fontFamily: R.mono,
   },
 
-  // ── Over cards ──
-  oversList: {
-    paddingHorizontal: 12,
-  },
+  oversList: { paddingHorizontal: 12 },
   overCard: {
-    backgroundColor: '#1e293b',
+    backgroundColor: R.bgCard,
     borderRadius: 12,
     padding: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.04)',
+    borderColor: R.border,
   },
-  overCardAlt: {
-    backgroundColor: 'rgba(30,41,59,0.5)',
-  },
+  overCardAlt: { backgroundColor: R.bgCardAlt },
   overHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 10,
+    gap: 8,
   },
-  overNumberBadge: {
+  overNumBadge: {
     width: 28,
     height: 28,
     borderRadius: 7,
-    backgroundColor: '#10b981',
+    backgroundColor: R.teal,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
   },
-  overNumberText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  overSummary: {
-    fontSize: 13,
-    color: '#94a3b8',
-    fontWeight: '600',
-    flex: 1,
-  },
-  overHeaderStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  overHeaderRuns: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#cbd5e1',
-  },
-  overHeaderWickets: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#ef4444',
-  },
-
-  // ✅ Legal balls only in the 6-box grid
-  ballsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 5,
-    marginBottom: 4,
-  },
+  overNumText: { fontSize: 13, fontWeight: '900', color: '#fff', fontFamily: R.mono },
+  overRuns: { fontSize: 13, fontWeight: '700', color: R.text, fontFamily: R.mono },
+  overWkts: { fontSize: 13, fontWeight: '700', color: R.red, fontFamily: R.mono },
+  ballsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginBottom: 4 },
   emptyBall: {
-    width: 24,
-    height: 24,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: 'transparent',
+    width: 26, height: 26, borderRadius: 4,
+    borderWidth: 1, borderColor: R.border,
   },
-
-  // ✅ Extras shown in a separate clearly labelled row
   extrasRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 6,
     paddingTop: 6,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.05)',
+    borderTopColor: R.border,
     flexWrap: 'wrap',
     gap: 4,
   },
   extrasLabel: {
     fontSize: 10,
-    color: '#64748b',
-    fontWeight: '600',
-    textTransform: 'uppercase',
+    color: R.textMuted,
+    fontWeight: '700',
     letterSpacing: 0.5,
-    marginRight: 2,
+    fontFamily: R.mono,
   },
 
-  // ── Delete ──
-  deleteButton: {
+  deleteBtn: {
     margin: 12,
     marginTop: 20,
-    backgroundColor: 'rgba(239,68,68,0.08)',
+    backgroundColor: 'rgba(198,40,40,0.08)',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.2)',
+    borderColor: 'rgba(198,40,40,0.2)',
     paddingVertical: 14,
     alignItems: 'center',
   },
-  deleteText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#ef4444',
-  },
-
-  // ── Empty state ──
-  emptyState: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#64748b',
-  },
+  deleteBtnText: { fontSize: 15, fontWeight: '800', color: R.red, fontFamily: R.mono },
+  emptyState: { padding: 40, alignItems: 'center' },
+  emptyText: { fontSize: 14, color: R.textMuted },
 });
 
 export default MatchDetailScreen;

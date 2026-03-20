@@ -1,195 +1,173 @@
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from "react-native";
 import { ScoringAction } from "../../utils/scoringEngine";
 import NoBallModal from "../NoBallModal/NoBallModal";
 import FirstBounceModal from "../FirstBounceModal/FirstBounceModal";
+import WideModal from "../WideModal/WideModal";
+
+// ── Retro Palette ─────────────────────────────────────────────────────────────
+const R = {
+  bg: '#122B22',
+  text: '#F5F5DC',
+  textMuted: '#8FAF99',
+  accent: '#D4A017',
+  teal: '#00897B',
+  border: '#2E5040',
+  red: '#C62828',
+  four: '#1565C0',
+  six: '#2E7D32',
+  purple: '#6A1B9A',
+  orange: '#E65100',
+  mono: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+};
 
 interface ScoreButtonsProps {
   onScore: (action: ScoringAction) => void;
   disabled?: boolean;
 }
 
-const ScoreButtons: React.FC<ScoreButtonsProps> = ({
-  onScore,
-  disabled = false,
-}) => {
+const ScoreButtons: React.FC<ScoreButtonsProps> = ({ onScore, disabled = false }) => {
   const [showNoBallModal, setShowNoBallModal] = useState(false);
   const [showFirstBounceModal, setShowFirstBounceModal] = useState(false);
+  const [showWideModal, setShowWideModal] = useState(false);
 
-  const handleRun = (runs: number) => {
-    onScore({ type: "run", value: runs });
+  const handleRun = (runs: number) => onScore({ type: "run", value: runs });
+  const handleWicket = () => onScore({ type: "wicket" });
+  const handleDot = () => onScore({ type: "dot" });
+  const handleUndo = () => onScore({ type: "undo" });
+
+  const handleWide = () => setShowWideModal(true);
+  const handleWideSelect = (extraRuns: number) => {
+    setShowWideModal(false);
+    onScore({ type: "wide", value: extraRuns });
   };
 
-  const handleWicket = () => {
-    onScore({ type: "wicket" });
-  };
-
-  const handleWide = () => {
-    onScore({ type: "wide" });
-  };
-
-  const handleNoBall = () => {
-    setShowNoBallModal(true);
-  };
-
+  const handleNoBall = () => setShowNoBallModal(true);
   const handleNoBallSelect = (runs: number) => {
     setShowNoBallModal(false);
     onScore({ type: "noball", value: runs });
   };
 
-  const handle1stBounce = () => {
-    setShowFirstBounceModal(true);
-  };
-
+  const handle1stBounce = () => setShowFirstBounceModal(true);
   const handle1stBounceSelect = (runs: number) => {
     setShowFirstBounceModal(false);
     onScore({ type: "1stbounce", value: runs });
   };
 
-  const handleDot = () => {
-    onScore({ type: "dot" });
-  };
-
-  const handleUndo = () => {
-    onScore({ type: "undo" });
-  };
-
   return (
     <View style={styles.container}>
-      {/* Run buttons row */}
-      <View style={styles.buttonRow}>
-        {[1, 2, 3, 4, 6].map((run) => (
+
+      {/* ── Run buttons row ── */}
+      <View style={styles.row}>
+        {[1, 2, 3].map((run) => (
           <TouchableOpacity
             key={run}
-            style={[
-              styles.runButton,
-              run === 4 && styles.fourButton,
-              run === 6 && styles.sixButton,
-              disabled && styles.disabledButton,
-            ]}
+            style={[styles.runBtn, disabled && styles.btnDisabled]}
             onPress={() => handleRun(run)}
             disabled={disabled}
+            activeOpacity={0.75}
           >
-            <Text
-              style={[
-                styles.buttonText,
-                (run === 4 || run === 6) && styles.specialButtonText,
-                disabled && styles.disabledButtonText,
-              ]}
-            >
-              {run}
-            </Text>
+            <Text style={[styles.runBtnText, disabled && styles.textDisabled]}>{run}</Text>
           </TouchableOpacity>
         ))}
+
+        <TouchableOpacity
+          style={[styles.runBtn, styles.fourBtn, disabled && styles.btnDisabled]}
+          onPress={() => handleRun(4)}
+          disabled={disabled}
+          activeOpacity={0.75}
+        >
+          <Text style={[styles.specialBtnText, disabled && styles.textDisabled]}>4</Text>
+          <Text style={styles.specialBtnSub}>FOUR</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.runBtn, styles.sixBtn, disabled && styles.btnDisabled]}
+          onPress={() => handleRun(6)}
+          disabled={disabled}
+          activeOpacity={0.75}
+        >
+          <Text style={[styles.specialBtnText, disabled && styles.textDisabled]}>6</Text>
+          <Text style={styles.specialBtnSub}>SIX</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Special buttons row */}
-      <View style={styles.buttonRow}>
+      {/* ── Special buttons row ── */}
+      <View style={styles.row}>
         <TouchableOpacity
-          style={[
-            styles.specialButton,
-            styles.wicketButton,
-            disabled && styles.disabledButton,
-          ]}
+          style={[styles.specBtn, styles.wicketBtn, disabled && styles.btnDisabled]}
           onPress={handleWicket}
           disabled={disabled}
+          activeOpacity={0.75}
         >
-          <Text
-            style={[styles.buttonText, disabled && styles.disabledButtonText]}
-          >
-            W
-          </Text>
+          <Text style={[styles.specBtnText, disabled && styles.textDisabled]}>W</Text>
+          <Text style={styles.specBtnSub}>WKT</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[
-            styles.specialButton,
-            styles.dotButton,
-            disabled && styles.disabledButton,
-          ]}
+          style={[styles.specBtn, styles.dotBtn, disabled && styles.btnDisabled]}
           onPress={handleDot}
           disabled={disabled}
+          activeOpacity={0.75}
         >
-          <Text
-            style={[styles.buttonText, disabled && styles.disabledButtonText]}
-          >
-            0
-          </Text>
+          <Text style={[styles.specBtnText, disabled && styles.textDisabled]}>●</Text>
+          <Text style={styles.specBtnSub}>DOT</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[
-            styles.specialButton,
-            styles.noBallButton,
-            disabled && styles.disabledButton,
-          ]}
+          style={[styles.specBtn, styles.noBallBtn, disabled && styles.btnDisabled]}
           onPress={handleNoBall}
           disabled={disabled}
+          activeOpacity={0.75}
         >
-          <Text
-            style={[styles.buttonText, disabled && styles.disabledButtonText]}
-          >
-            NB
-          </Text>
+          <Text style={[styles.specBtnText, disabled && styles.textDisabled]}>NB</Text>
+          <Text style={styles.specBtnSub}>NO BALL</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[
-            styles.specialButton,
-            styles.firstBounceButton,
-            disabled && styles.disabledButton,
-          ]}
+          style={[styles.specBtn, styles.firstBounceBtn, disabled && styles.btnDisabled]}
           onPress={handle1stBounce}
           disabled={disabled}
+          activeOpacity={0.75}
         >
-          <Text
-            style={[styles.buttonText, disabled && styles.disabledButtonText]}
-          >
-            1B
-          </Text>
+          <Text style={[styles.specBtnText, disabled && styles.textDisabled]}>1B</Text>
+          <Text style={styles.specBtnSub}>BOUNCE</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[
-            styles.specialButton,
-            styles.wideButton,
-            disabled && styles.disabledButton,
-          ]}
+          style={[styles.specBtn, styles.wideBtn, disabled && styles.btnDisabled]}
           onPress={handleWide}
           disabled={disabled}
+          activeOpacity={0.75}
         >
-          <Text
-            style={[styles.buttonText, disabled && styles.disabledButtonText]}
-          >
-            WD
-          </Text>
+          <Text style={[styles.specBtnText, disabled && styles.textDisabled]}>WD</Text>
+          <Text style={styles.specBtnSub}>WIDE</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Undo button */}
+      {/* ── Undo row ── */}
       <View style={styles.undoRow}>
         <TouchableOpacity
-          style={[styles.undoButton, disabled && styles.disabledButton]}
+          style={[styles.undoBtn, disabled && styles.btnDisabled]}
           onPress={handleUndo}
           disabled={disabled}
+          activeOpacity={0.75}
         >
-          <Text
-            style={[
-              styles.undoButtonText,
-              disabled && styles.disabledButtonText,
-            ]}
-          >
-            ↶ Undo
-          </Text>
+          <Text style={[styles.undoBtnText, disabled && styles.textDisabled]}>↶  UNDO</Text>
         </TouchableOpacity>
       </View>
 
+      {/* Modals */}
+      <WideModal
+        visible={showWideModal}
+        onSelect={handleWideSelect}
+        onClose={() => setShowWideModal(false)}
+      />
       <NoBallModal
         visible={showNoBallModal}
         onSelect={handleNoBallSelect}
         onClose={() => setShowNoBallModal(false)}
       />
-
       <FirstBounceModal
         visible={showFirstBounceModal}
         onSelect={handle1stBounceSelect}
@@ -201,154 +179,148 @@ const ScoreButtons: React.FC<ScoreButtonsProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#1e293b",
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-    borderTopWidth: 1,
-    borderTopColor: "#334155",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 8,
+    backgroundColor: R.bg,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderTopWidth: 2,
+    borderTopColor: R.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 10,
   },
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 16,
-    gap: 8,
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    gap: 6,
   },
-  runButton: {
+
+  // Run buttons (1,2,3,4,6)
+  runBtn: {
     flex: 1,
-    height: 56,
-    backgroundColor: "#1e293b",
-    justifyContent: "center",
-    alignItems: "center",
+    height: 58,
+    backgroundColor: '#1E3D2F',
+    justifyContent: 'center',
+    alignItems: 'center',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#334155",
-    shadowColor: "#000",
+    borderColor: R.border,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.2,
     shadowRadius: 3,
     elevation: 3,
   },
-  fourButton: {
-    backgroundColor: "#1e40af",
-    borderColor: "#3b82f6",
-    shadowColor: "#3b82f6",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
+  fourBtn: {
+    backgroundColor: '#0D2447',
+    borderColor: R.four,
+    shadowColor: R.four,
+    shadowOpacity: 0.4,
+    elevation: 5,
   },
-  sixButton: {
-    backgroundColor: "#059669",
-    borderColor: "#10b981",
-    shadowColor: "#10b981",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
+  sixBtn: {
+    backgroundColor: '#1A3D1A',
+    borderColor: R.six,
+    shadowColor: R.six,
+    shadowOpacity: 0.4,
+    elevation: 5,
   },
-  specialButton: {
+  runBtnText: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: R.text,
+    fontFamily: R.mono,
+  },
+  specialBtnText: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#ffffff',
+    fontFamily: R.mono,
+    lineHeight: 26,
+  },
+  specialBtnSub: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: 'rgba(255,255,255,0.6)',
+    letterSpacing: 1,
+    marginTop: 1,
+  },
+
+  // Special buttons (W, 0, NB, 1B, WD)
+  specBtn: {
     flex: 1,
-    height: 50,
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: 12,
-    marginHorizontal: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  wicketButton: {
-    backgroundColor: "#dc2626",
-    borderColor: "#ef4444",
+    height: 52,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 11,
     borderWidth: 1,
-    shadowColor: "#dc2626",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 4,
   },
-  dotButton: {
-    backgroundColor: "#475569",
-    borderColor: "#64748b",
-    borderWidth: 1,
+  wicketBtn: {
+    backgroundColor: '#3B0D0D',
+    borderColor: R.red,
+    shadowColor: R.red,
   },
-  noBallButton: {
-    backgroundColor: "#d97706",
-    borderColor: "#f59e0b",
-    borderWidth: 1,
-    shadowColor: "#d97706",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
+  dotBtn: {
+    backgroundColor: '#1C2B35',
+    borderColor: '#37474F',
+    shadowColor: '#000',
   },
-  firstBounceButton: {
-    backgroundColor: "#7c3aed",
-    borderColor: "#a78bfa",
-    borderWidth: 1,
-    shadowColor: "#7c3aed",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
+  noBallBtn: {
+    backgroundColor: '#3D1A00',
+    borderColor: R.orange,
+    shadowColor: R.orange,
   },
-  wideButton: {
-    backgroundColor: "#d97706",
-    borderColor: "#f59e0b",
-    borderWidth: 1,
-    shadowColor: "#d97706",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
+  firstBounceBtn: {
+    backgroundColor: '#2D0A4E',
+    borderColor: R.purple,
+    shadowColor: R.purple,
   },
-  buttonText: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#f1f5f9",
+  wideBtn: {
+    backgroundColor: '#3D1A00',
+    borderColor: R.orange,
+    shadowColor: R.orange,
   },
-  specialButtonText: {
-    color: "#ffffff",
-    textShadowColor: "rgba(0, 0, 0, 0.3)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 1,
+  specBtnText: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: R.text,
+    fontFamily: R.mono,
+    lineHeight: 20,
   },
-  disabledButton: {
-    opacity: 0.4,
-    shadowOpacity: 0,
-    elevation: 0,
+  specBtnSub: {
+    fontSize: 7,
+    fontWeight: '800',
+    color: R.textMuted,
+    letterSpacing: 0.8,
+    marginTop: 1,
   },
-  disabledButtonText: {
-    color: "#64748b",
-  },
-  undoRow: {
-    alignItems: "center",
-    marginTop: 8,
-  },
-  undoButton: {
-    backgroundColor: "#1e293b",
+
+  // Disabled
+  btnDisabled: { opacity: 0.35, elevation: 0, shadowOpacity: 0 },
+  textDisabled: { color: R.textMuted },
+
+  // Undo
+  undoRow: { alignItems: 'center', marginTop: 2 },
+  undoBtn: {
+    backgroundColor: R.bg,
     paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 24,
+    paddingVertical: 10,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: "#334155",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    borderColor: R.border,
   },
-  undoButtonText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#94a3b8",
+  undoBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: R.textMuted,
+    letterSpacing: 1,
+    fontFamily: R.mono,
   },
 });
 

@@ -1,4 +1,4 @@
-import { Match, Ball, Over, Player } from "../types";
+import { Match, Ball, Over, Player, Highlight } from "../types";
 
 export interface ScoringAction {
   type: "run" | "wicket" | "wide" | "noball" | "1stbounce" | "dot" | "undo";
@@ -6,7 +6,7 @@ export interface ScoringAction {
 }
 
 /**
- * Cricket Scoring Engine - Fixed Version
+ * Cricket Scoring Engine
  *
  * Key Rules:
  * - An over consists of 6 legal deliveries
@@ -23,7 +23,7 @@ export class ScoringEngine {
       case "wicket":
         return this.handleWicket(updatedMatch);
       case "wide":
-        return this.handleWide(updatedMatch);
+        return this.handleWide(updatedMatch, action.value ?? 0);
       case "noball":
         return this.handleNoBall(updatedMatch, action.value);
       case "1stbounce":
@@ -39,7 +39,6 @@ export class ScoringEngine {
 
   /**
    * Calculate current over number (1-indexed)
-   * Balls 1-6 = Over 1, Balls 7-12 = Over 2, etc.
    */
   private static getCurrentOverNumber(totalLegalBalls: number): number {
     if (totalLegalBalls === 0) return 1;
@@ -55,36 +54,28 @@ export class ScoringEngine {
   }
 
   private static handleRun(match: Match, runs: number): Match {
-    // Update team total
     match.totalRuns += runs;
 
-    // Update batsman stats
     const striker = match.players.find((p) => p.id === match.currentStrikerId);
     if (striker) {
       striker.runs += runs;
       striker.balls += 1;
     }
 
-    // Update bowler stats
     const bowler = match.players.find((p) => p.id === match.currentBowlerId);
     if (bowler) {
       bowler.runsConceded += runs;
     }
 
-    // Increment legal ball count
     match.balls += 1;
-
-    // Update completed overs count
     match.overs = Math.floor(match.balls / 6);
 
-    // Handle strike rotation
     if (runs % 2 === 1 || match.balls % 6 === 0) {
       this.rotateStrike(match);
     }
 
-    // Add ball to current over
     this.addBallToOver(match, {
-      id: `ball_${Date.now()}`,
+      id: `ball_${Date.now()}_${Math.random()}`,
       overNumber: this.getCurrentOverNumber(match.balls),
       ballNumber: this.getBallNumberInOver(match.balls),
       runs,
@@ -123,7 +114,7 @@ export class ScoringEngine {
     this.nextBatsman(match);
 
     this.addBallToOver(match, {
-      id: `ball_${Date.now()}`,
+      id: `ball_${Date.now()}_${Math.random()}`,
       overNumber: this.getCurrentOverNumber(match.balls),
       ballNumber: this.getBallNumberInOver(match.balls),
       runs: 0,
@@ -139,25 +130,26 @@ export class ScoringEngine {
     return match;
   }
 
-  private static handleWide(match: Match): Match {
-    match.totalRuns += 1;
-    match.extras += 1;
+  // Wide now accepts 0 or 1 extra runs (from WideModal)
+  // Total runs = 1 (wide penalty) + extraRuns
+  private static handleWide(match: Match, extraRuns: number = 0): Match {
+    const totalRuns = 1 + extraRuns;
+    match.totalRuns += totalRuns;
+    match.extras += 1; // Only 1 extra counted (the wide penalty)
 
     const bowler = match.players.find((p) => p.id === match.currentBowlerId);
     if (bowler) {
-      bowler.runsConceded += 1;
+      bowler.runsConceded += totalRuns;
     }
 
-    // Extras belong to the CURRENT over (same over as the next legal ball)
-    // Don't add +1 or clamp — just use match.balls directly to get the current over
-    const currentOverNum = this.getCurrentOverNumber(match.balls + 1); // +1 because balls is 0-indexed pre-increment
+    const currentOverNum = this.getCurrentOverNumber(match.balls + 1);
     const displayBallNum = this.getBallNumberInOver(match.balls + 1);
 
     this.addBallToOver(match, {
-      id: `ball_${Date.now()}`,
+      id: `ball_${Date.now()}_${Math.random()}`,
       overNumber: currentOverNum,
       ballNumber: displayBallNum,
-      runs: 1,
+      runs: totalRuns,
       isWicket: false,
       isWide: true,
       isNoBall: false,
@@ -171,11 +163,9 @@ export class ScoringEngine {
   }
 
   private static handleNoBall(match: Match, runs: number = 1): Match {
-    // Add the no-ball extra (1 run) + any runs scored off the bat
     match.totalRuns += runs;
     match.extras += 1;
 
-    // Add runs to batsman if they scored off the bat
     if (runs > 0) {
       const striker = match.players.find(
         (p) => p.id === match.currentStrikerId,
@@ -191,15 +181,14 @@ export class ScoringEngine {
       bowler.runsConceded += 1 + runs;
     }
 
-    // Same logic as wide
     const currentOverNum = this.getCurrentOverNumber(match.balls + 1);
     const displayBallNum = this.getBallNumberInOver(match.balls + 1);
 
     this.addBallToOver(match, {
-      id: `ball_${Date.now()}`,
+      id: `ball_${Date.now()}_${Math.random()}`,
       overNumber: currentOverNum,
       ballNumber: displayBallNum,
-      runs: 1 + runs, // Total runs for this ball (1 for no-ball + runs off bat)
+      runs: 1 + runs,
       isWicket: false,
       isWide: false,
       isNoBall: true,
@@ -213,35 +202,28 @@ export class ScoringEngine {
   }
 
   private static handle1stBounce(match: Match, runs: number = 0): Match {
-    // 1st Bounce is a legal ball - counts toward the 6-ball over
-    // Add the runs scored off the bat (no automatic extra)
     match.totalRuns += runs;
 
-    // Add runs to batsman
     const striker = match.players.find((p) => p.id === match.currentStrikerId);
     if (striker) {
       striker.runs += runs;
       striker.balls += 1;
     }
 
-    // Update bowler stats
     const bowler = match.players.find((p) => p.id === match.currentBowlerId);
     if (bowler) {
       bowler.runsConceded += runs;
     }
 
-    // Increment legal ball count (counts toward the 6-ball over)
     match.balls += 1;
     match.overs = Math.floor(match.balls / 6);
 
-    // Handle strike rotation
     if (runs % 2 === 1 || match.balls % 6 === 0) {
       this.rotateStrike(match);
     }
 
-    // Add ball to current over
     this.addBallToOver(match, {
-      id: `ball_${Date.now()}`,
+      id: `ball_${Date.now()}_${Math.random()}`,
       overNumber: this.getCurrentOverNumber(match.balls),
       ballNumber: this.getBallNumberInOver(match.balls),
       runs,
@@ -271,7 +253,7 @@ export class ScoringEngine {
     }
 
     this.addBallToOver(match, {
-      id: `ball_${Date.now()}`,
+      id: `ball_${Date.now()}_${Math.random()}`,
       overNumber: this.getCurrentOverNumber(match.balls),
       ballNumber: this.getBallNumberInOver(match.balls),
       runs: 0,
@@ -296,16 +278,14 @@ export class ScoringEngine {
     const lastBall = lastOver.balls[lastOver.balls.length - 1];
 
     if (lastBall.isWide || lastBall.isNoBall) {
-      // Extra ball
       match.totalRuns = Math.max(0, match.totalRuns - lastBall.runs);
-      match.extras = Math.max(0, match.extras - lastBall.runs);
+      match.extras = Math.max(0, match.extras - 1);
 
       const bowler = match.players.find((p) => p.id === lastBall.bowlerId);
       if (bowler) {
         bowler.runsConceded = Math.max(0, bowler.runsConceded - lastBall.runs);
       }
     } else if (lastBall.is1stBounce) {
-      // 1st Bounce is a legal ball
       match.totalRuns = Math.max(0, match.totalRuns - lastBall.runs);
       match.balls = Math.max(0, match.balls - 1);
       match.overs = Math.floor(match.balls / 6);
@@ -325,7 +305,6 @@ export class ScoringEngine {
         this.rotateStrike(match);
       }
     } else {
-      // Legal ball
       match.totalRuns = Math.max(0, match.totalRuns - lastBall.runs);
       match.balls = Math.max(0, match.balls - 1);
       match.overs = Math.floor(match.balls / 6);
@@ -447,11 +426,92 @@ export class ScoringEngine {
   }
 
   static getBallColor(ball: Ball): string {
-    if (ball.is1stBounce) return "#7c3aed"; // Purple for 1st Bounce
-    if (ball.runs === 6) return "#10b981"; // Green
-    if (ball.runs === 4) return "#3b82f6"; // Blue
-    if (ball.isWicket) return "#ef4444"; // Red
-    if (ball.isWide || ball.isNoBall) return "#f59e0b"; // Amber
-    return "#14b8a6"; // Teal
+    if (ball.is1stBounce) return "#6A1B9A";
+    if (ball.runs === 6 && !ball.isWide && !ball.isNoBall) return "#2E7D32";
+    if (ball.runs === 4 && !ball.isWide && !ball.isNoBall) return "#1565C0";
+    if (ball.isWicket) return "#C62828";
+    if (ball.isWide || ball.isNoBall) return "#E65100";
+    if (ball.isDot) return "#37474F";
+    return "#00695C";
+  }
+
+  // Compute highlights from oversList for a match
+  static computeHighlights(match: Match): Highlight[] {
+    const highlights: Highlight[] = [];
+    const playerMap: Record<string, string> = {};
+    match.players.forEach((p) => { playerMap[p.id] = p.name; });
+
+    // Track consecutive wickets per bowler for hat-trick detection
+    const recentWickets: { bowlerId: string; overNum: number; ballNum: number }[] = [];
+
+    for (const over of match.oversList) {
+      for (const ball of over.balls) {
+        const batsmanName = playerMap[ball.batsmanId] || 'BT';
+        const bowlerName = playerMap[ball.bowlerId] || 'B';
+
+        if (ball.runs === 6 && !ball.isWide && !ball.isNoBall) {
+          highlights.push({
+            id: ball.id + '_6',
+            type: 'six',
+            overNumber: ball.overNumber,
+            ballNumber: ball.ballNumber,
+            batsmanName,
+            bowlerName,
+            label: `${batsmanName} hits a SIX!`,
+            emoji: '6️⃣',
+          });
+        } else if (ball.runs === 4 && !ball.isWide && !ball.isNoBall) {
+          highlights.push({
+            id: ball.id + '_4',
+            type: 'four',
+            overNumber: ball.overNumber,
+            ballNumber: ball.ballNumber,
+            batsmanName,
+            bowlerName,
+            label: `${batsmanName} hits a FOUR!`,
+            emoji: '4️⃣',
+          });
+        }
+
+        if (ball.isWicket) {
+          recentWickets.push({ bowlerId: ball.bowlerId, overNum: ball.overNumber, ballNum: ball.ballNumber });
+
+          // Check hat-trick: last 3 wickets by same bowler
+          if (recentWickets.length >= 3) {
+            const last3 = recentWickets.slice(-3);
+            if (last3.every(w => w.bowlerId === ball.bowlerId)) {
+              highlights.push({
+                id: ball.id + '_ht',
+                type: 'hattrick',
+                overNumber: ball.overNumber,
+                ballNumber: ball.ballNumber,
+                batsmanName,
+                bowlerName,
+                label: `HAT-TRICK! ${bowlerName} takes 3 in a row!`,
+                emoji: '💥',
+              });
+            }
+          }
+
+          highlights.push({
+            id: ball.id + '_W',
+            type: 'wicket',
+            overNumber: ball.overNumber,
+            ballNumber: ball.ballNumber,
+            batsmanName,
+            bowlerName,
+            label: `WICKET! ${batsmanName} out`,
+            emoji: '🔥',
+          });
+        } else {
+          // Non-wicket ball: only clear streak if it's a legal ball
+          if (!ball.isWide && !ball.isNoBall) {
+            recentWickets.length = 0;
+          }
+        }
+      }
+    }
+
+    return highlights;
   }
 }

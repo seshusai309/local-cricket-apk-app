@@ -7,12 +7,25 @@ import {
   Alert,
   Animated,
   FlatList,
+  Platform,
 } from 'react-native';
 import { useMatchStore } from '../store/matchStore';
 import { ScoringEngine, ScoringAction } from '../utils/scoringEngine';
 import ScoreButtons from '../components/ScoreButtons/ScoreButtons';
 import OverRow from '../components/OverRow/OverRow';
 import { Over } from '../types';
+
+const R = {
+  bg: '#1B3A2F',
+  bgCard: '#122B22',
+  text: '#F5F5DC',
+  textMuted: '#8FAF99',
+  accent: '#D4A017',
+  teal: '#00897B',
+  border: '#2E5040',
+  red: '#C62828',
+  mono: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+};
 
 interface LiveMatchScreenProps {
   navigation: any;
@@ -26,8 +39,8 @@ const LiveMatchScreen: React.FC<LiveMatchScreenProps> = ({ navigation }) => {
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.05, duration: 1000, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.15, duration: 900, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
       ])
     ).start();
   }, []);
@@ -56,7 +69,7 @@ const LiveMatchScreen: React.FC<LiveMatchScreenProps> = ({ navigation }) => {
           }
         >
           <View style={styles.endMatchGradient}>
-            <Text style={styles.endMatchText}>End</Text>
+            <Text style={styles.endMatchText}>END</Text>
           </View>
         </TouchableOpacity>
       ),
@@ -71,7 +84,6 @@ const LiveMatchScreen: React.FC<LiveMatchScreenProps> = ({ navigation }) => {
     return unsubscribe;
   }, [navigation]);
 
-  // Auto-scroll to current (last) over whenever oversList changes
   useEffect(() => {
     if (!currentMatch?.oversList?.length) return;
     const timer = setTimeout(() => {
@@ -80,7 +92,7 @@ const LiveMatchScreen: React.FC<LiveMatchScreenProps> = ({ navigation }) => {
     return () => clearTimeout(timer);
   }, [currentMatch?.oversList?.length, currentMatch?.balls]);
 
-  const handleScore = async (action: ScoringAction) => {
+  const handleScore = (action: ScoringAction) => {
     if (!currentMatch) return;
     try {
       const updatedMatch = ScoringEngine.addBall(currentMatch, action);
@@ -91,7 +103,7 @@ const LiveMatchScreen: React.FC<LiveMatchScreenProps> = ({ navigation }) => {
         (updatedMatch.overs >= updatedMatch.maxOvers && updatedMatch.balls % 6 === 0)
       ) {
         setTimeout(() => {
-          Alert.alert('Match Complete', 'The match has been completed. View summary?', [
+          Alert.alert('Match Complete', 'The innings is over. End match?', [
             { text: 'Continue', style: 'cancel' },
             { text: 'End Match', onPress: handleEndMatch },
           ]);
@@ -111,21 +123,22 @@ const LiveMatchScreen: React.FC<LiveMatchScreenProps> = ({ navigation }) => {
 
   const currentOverNumber = currentMatch.overs + 1;
   const ballsInOver = currentMatch.balls % 6;
-  const runRate =
-    currentMatch.overs > 0
-      ? (currentMatch.totalRuns / (currentMatch.overs + ballsInOver / 6)).toFixed(1)
-      : '0.0';
+  const ballsLeft = Math.max(0, currentMatch.maxOvers * 6 - currentMatch.balls);
+
+  const hasTarget = (currentMatch.targetScore ?? 0) > 0;
+  const runsNeeded = hasTarget ? Math.max(0, currentMatch.targetScore - currentMatch.totalRuns) : 0;
+  const isWon = hasTarget && currentMatch.totalRuns >= currentMatch.targetScore;
 
   return (
     <View style={styles.container}>
 
-      {/* ── Minimal Score Header ── */}
+      {/* ── Score Header ── */}
       <View style={styles.scoreCard}>
 
-        {/* Row 1: Team + LIVE badge */}
+        {/* Row 1: Team + LIVE */}
         <View style={styles.topRow}>
           <Text style={styles.teamName} numberOfLines={1}>{currentMatch.teamName}</Text>
-          <View style={styles.liveIndicator}>
+          <View style={styles.liveBadge}>
             <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
               <View style={styles.liveDot} />
             </Animated.View>
@@ -133,43 +146,69 @@ const LiveMatchScreen: React.FC<LiveMatchScreenProps> = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Row 2: Score + Overs inline */}
+        {/* Row 2: Runs/Wickets LEFT — Target remaining or Overs RIGHT */}
         <View style={styles.scoreRow}>
+          {/* Left: score */}
           <View style={styles.scoreLeft}>
-            <Text style={styles.runs}>{currentMatch.totalRuns}</Text>
+            <View style={styles.digitBox}>
+              <Text style={styles.runsDigit}>{currentMatch.totalRuns}</Text>
+            </View>
             <Text style={styles.separator}>/</Text>
-            <Text style={styles.wickets}>{currentMatch.wickets}</Text>
+            <Text style={styles.wicketsDigit}>{currentMatch.wickets}</Text>
           </View>
+
+          {/* Right: target remaining (if set) OR overs */}
           <View style={styles.scoreRight}>
-            <Text style={styles.oversMain}>
-              {currentMatch.overs}.{ballsInOver}
-            </Text>
-            <Text style={styles.oversOf}>/ {currentMatch.maxOvers} ov</Text>
+            {hasTarget ? (
+              isWon ? (
+                <View style={styles.wonBox}>
+                  <Text style={styles.wonText}>WON</Text>
+                  <Text style={styles.wonEmoji}>🏆</Text>
+                </View>
+              ) : (
+                <View style={styles.targetBox}>
+                  <Text style={styles.targetNeedNum}>{runsNeeded}</Text>
+                  <Text style={styles.targetNeedLabel}>TO WIN</Text>
+                </View>
+              )
+            ) : (
+              <View style={styles.oversBox}>
+                <Text style={styles.oversDigit}>{currentMatch.overs}.{ballsInOver}</Text>
+                <Text style={styles.oversOf}>/ {currentMatch.maxOvers} ov</Text>
+              </View>
+            )}
           </View>
         </View>
 
-        {/* Row 3: Compact stats pill row */}
+        {/* Row 3: If target set, show overs + balls left inline */}
+        {hasTarget && !isWon && (
+          <View style={styles.targetInfoRow}>
+            <Text style={styles.targetInfoText}>
+              {currentMatch.overs}.{ballsInOver} ov  ·  {ballsLeft} balls left
+            </Text>
+          </View>
+        )}
+
+        {/* Row 4: Extras pill only */}
         <View style={styles.pillRow}>
           <View style={styles.pill}>
-            <Text style={styles.pillValue}>{runRate}</Text>
-            <Text style={styles.pillLabel}>RR</Text>
+            <Text style={styles.pillVal}>{currentMatch.extras}</Text>
+            <Text style={styles.pillLbl}>EXTRAS</Text>
           </View>
           <View style={styles.pillDivider} />
           <View style={styles.pill}>
-            <Text style={styles.pillValue}>{currentMatch.extras}</Text>
-            <Text style={styles.pillLabel}>Extras</Text>
+            <Text style={styles.pillVal}>{currentMatch.wickets}</Text>
+            <Text style={styles.pillLbl}>WICKETS</Text>
           </View>
           <View style={styles.pillDivider} />
           <View style={styles.pill}>
-            <Text style={styles.pillValue}>
-              {Math.max(0, currentMatch.maxOvers * 6 - currentMatch.balls)}
-            </Text>
-            <Text style={styles.pillLabel}>Balls left</Text>
+            <Text style={styles.pillVal}>{currentMatch.maxOvers}</Text>
+            <Text style={styles.pillLbl}>MAX OV</Text>
           </View>
         </View>
       </View>
 
-      {/* ── Overs List (auto-scrolls to current) ── */}
+      {/* ── Overs List ── */}
       <FlatList
         ref={flatListRef}
         data={currentMatch.oversList}
@@ -194,157 +233,223 @@ const LiveMatchScreen: React.FC<LiveMatchScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: R.bg,
   },
 
-  // ── Score card ──
   scoreCard: {
-    backgroundColor: '#1e293b',
-    marginHorizontal: 12,
-    marginTop: 12,
+    backgroundColor: R.bgCard,
+    marginHorizontal: 10,
+    marginTop: 10,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: R.border,
+    elevation: 6,
   },
+
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   teamName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#cbd5e1',
+    fontSize: 14,
+    fontWeight: '800',
+    color: R.textMuted,
     flex: 1,
     marginRight: 8,
+    fontFamily: R.mono,
+    letterSpacing: 1,
   },
-  liveIndicator: {
+  liveBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(239,68,68,0.12)',
+    backgroundColor: 'rgba(198,40,40,0.12)',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.3)',
+    borderColor: 'rgba(198,40,40,0.35)',
     gap: 6,
   },
   liveDot: {
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: '#ef4444',
+    backgroundColor: R.red,
   },
   liveText: {
     fontSize: 11,
-    fontWeight: '800',
-    color: '#ef4444',
-    letterSpacing: 1,
+    fontWeight: '900',
+    color: R.red,
+    letterSpacing: 1.5,
+    fontFamily: R.mono,
   },
 
-  // Score + overs on same row
+  // Score row
   scoreRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   scoreLeft: {
     flexDirection: 'row',
     alignItems: 'flex-end',
   },
-  runs: {
-    fontSize: 52,
-    fontWeight: '800',
-    color: '#ffffff',
+  digitBox: {
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: R.border,
+  },
+  runsDigit: {
+    fontSize: 50,
+    fontWeight: '900',
+    color: R.accent,
+    fontFamily: R.mono,
     letterSpacing: -1,
     lineHeight: 56,
   },
   separator: {
-    fontSize: 32,
+    fontSize: 30,
     fontWeight: '300',
-    color: '#475569',
-    marginHorizontal: 3,
+    color: R.border,
+    marginHorizontal: 6,
     lineHeight: 56,
   },
-  wickets: {
+  wicketsDigit: {
     fontSize: 32,
-    fontWeight: '700',
-    color: '#ef4444',
+    fontWeight: '900',
+    color: R.red,
     lineHeight: 56,
+    fontFamily: R.mono,
   },
+
+  // Right side: target remaining
   scoreRight: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  targetBox: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(212,160,23,0.12)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(212,160,23,0.3)',
+  },
+  targetNeedNum: {
+    fontSize: 34,
+    fontWeight: '900',
+    color: R.accent,
+    fontFamily: R.mono,
+    lineHeight: 38,
+  },
+  targetNeedLabel: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: R.textMuted,
+    letterSpacing: 1.5,
+    fontFamily: R.mono,
+  },
+  wonBox: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,137,123,0.15)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0,137,123,0.4)',
+  },
+  wonText: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: R.teal,
+    fontFamily: R.mono,
+    letterSpacing: 2,
+  },
+  wonEmoji: { fontSize: 20 },
+
+  // Overs (when no target)
+  oversBox: {
     alignItems: 'flex-end',
     paddingBottom: 4,
   },
-  oversMain: {
+  oversDigit: {
     fontSize: 22,
-    fontWeight: '700',
-    color: '#10b981',
+    fontWeight: '900',
+    color: R.teal,
+    fontFamily: R.mono,
   },
   oversOf: {
-    fontSize: 12,
-    color: '#64748b',
+    fontSize: 11,
+    color: R.textMuted,
     marginTop: 1,
+    fontFamily: R.mono,
   },
 
-  // Compact pill stats
+  // Overs + balls left info row (shown when chasing target)
+  targetInfoRow: {
+    marginBottom: 8,
+  },
+  targetInfoText: {
+    fontSize: 12,
+    color: R.textMuted,
+    fontFamily: R.mono,
+    letterSpacing: 0.5,
+  },
+
+  // Pills (Extras + Wickets + Max Overs)
   pillRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.05)',
+    borderTopColor: R.border,
   },
-  pill: {
-    alignItems: 'center',
-    flex: 1,
+  pill: { alignItems: 'center', flex: 1 },
+  pillVal: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: R.text,
+    fontFamily: R.mono,
   },
-  pillValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  pillLabel: {
-    fontSize: 10,
-    color: '#64748b',
+  pillLbl: {
+    fontSize: 8,
+    color: R.textMuted,
+    letterSpacing: 0.8,
+    marginTop: 2,
+    fontFamily: R.mono,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginTop: 1,
   },
   pillDivider: {
     width: 1,
-    height: 24,
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    height: 22,
+    backgroundColor: R.border,
   },
 
-  // Overs list
-  oversList: {
-    flex: 1,
-    marginTop: 10,
-  },
-  oversListContent: {
-    paddingBottom: 8,
-    paddingHorizontal: 4,
-  },
+  oversList: { flex: 1, marginTop: 8 },
+  oversListContent: { paddingBottom: 6, paddingHorizontal: 4 },
 
-  // Nav header button
-  endMatchButton: {
-    marginRight: 8,
-  },
+  endMatchButton: { marginRight: 8 },
   endMatchGradient: {
-    backgroundColor: '#dc2626',
+    backgroundColor: R.red,
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 10,
   },
   endMatchText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '700',
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+    fontFamily: R.mono,
   },
 });
 

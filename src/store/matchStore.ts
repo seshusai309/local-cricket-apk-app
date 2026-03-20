@@ -8,7 +8,7 @@ interface MatchStore extends MatchState {
   setCurrentMatch: (match: Match | null) => void;
   loadMatches: () => Promise<void>;
   saveMatch: (match: Match) => Promise<void>;
-  createNewMatch: (teamName: string, maxOvers?: number) => Promise<Match>;
+  createNewMatch: (teamName: string, maxOvers?: number, targetScore?: number) => Promise<Match>;
   updateMatch: (updates: Partial<Match>) => void;
   updateMatchInStore: (updates: Partial<Match>) => void;
   completeMatch: () => void;
@@ -76,11 +76,12 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
     }
   },
 
-  createNewMatch: async (teamName: string, maxOvers: number = 20) => {
+  createNewMatch: async (teamName: string, maxOvers: number = 20, targetScore: number = 0) => {
     const newMatch: Match = {
       id: `match_${Date.now()}`,
       teamName,
       maxOvers,
+      targetScore,
       totalRuns: 0,
       wickets: 0,
       overs: 0,

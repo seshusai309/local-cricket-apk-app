@@ -35,10 +35,22 @@ export interface Over {
   extras: number;
 }
 
+export interface Highlight {
+  id: string;
+  type: 'six' | 'four' | 'wicket' | 'hattrick';
+  overNumber: number;
+  ballNumber: number;
+  batsmanName: string;
+  bowlerName: string;
+  label: string;
+  emoji: string;
+}
+
 export interface Match {
   id: string;
   teamName: string;
   maxOvers: number;
+  targetScore: number;
   totalRuns: number;
   wickets: number;
   overs: number;
