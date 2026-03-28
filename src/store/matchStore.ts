@@ -1,14 +1,21 @@
 import { create } from "zustand";
-import { Match, MatchState } from "../types";
+import { Match, MatchState, Player } from "../types";
 import { databaseService } from "../services/database";
 import { convertFromDB } from "../utils/typeConversion";
 
+export interface CreateMatchConfig {
+  team1Name: string;
+  team2Name: string;
+  maxOvers: number;
+  team1Players: string[];  // 11 names
+  team2Players: string[];  // 11 names
+}
+
 interface MatchStore extends MatchState {
-  // Actions
   setCurrentMatch: (match: Match | null) => void;
   loadMatches: () => Promise<void>;
   saveMatch: (match: Match) => Promise<void>;
-  createNewMatch: (teamName: string, maxOvers?: number, targetScore?: number) => Promise<Match>;
+  createNewMatch: (config: CreateMatchConfig) => Promise<Match>;
   updateMatch: (updates: Partial<Match>) => void;
   updateMatchInStore: (updates: Partial<Match>) => void;
   completeMatch: () => void;
@@ -42,10 +49,7 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
       const convertedMatches = matches.map((match) => convertFromDB(match));
       set({ matches: convertedMatches, isLoading: false });
 
-      // Set current match if there's an incomplete one
-      const incompleteMatch = convertedMatches.find((match) => {
-        return !match.isCompleted;
-      });
+      const incompleteMatch = convertedMatches.find((match) => !match.isCompleted);
       if (incompleteMatch) {
         set({ currentMatch: incompleteMatch });
       } else {
@@ -60,13 +64,9 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
   saveMatch: async (match) => {
     try {
       await databaseService.saveMatch(match);
-
-      // Update matches list
       const matches = await databaseService.getMatches();
       const convertedMatches = matches.map((m) => convertFromDB(m));
       set({ matches: convertedMatches });
-
-      // Update current match if it's the same one
       if (get().currentMatch?.id === match.id) {
         set({ currentMatch: convertFromDB(match) });
       }
@@ -76,59 +76,54 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
     }
   },
 
-  createNewMatch: async (teamName: string, maxOvers: number = 20, targetScore: number = 0) => {
+  createNewMatch: async (config: CreateMatchConfig) => {
+    const matchId = `match_${Date.now()}`;
+
+    const team1Players: Player[] = config.team1Players.map((name, i) => ({
+      id: `${matchId}_t1_p${i + 1}`,
+      name: name || `Player ${i + 1}`,
+      type: 'player' as const,
+      teamId: 'team1' as const,
+      isDismissed: false,
+      runs: 0, balls: 0, wickets: 0, runsConceded: 0, oversBowled: 0,
+      isStriker: false, isNonStriker: false, isBowling: false,
+    }));
+
+    const team2Players: Player[] = config.team2Players.map((name, i) => ({
+      id: `${matchId}_t2_p${i + 1}`,
+      name: name || `Player ${i + 1}`,
+      type: 'player' as const,
+      teamId: 'team2' as const,
+      isDismissed: false,
+      runs: 0, balls: 0, wickets: 0, runsConceded: 0, oversBowled: 0,
+      isStriker: false, isNonStriker: false, isBowling: false,
+    }));
+
     const newMatch: Match = {
-      id: `match_${Date.now()}`,
-      teamName,
-      maxOvers,
-      targetScore,
+      id: matchId,
+      teamName: config.team1Name,
+      team2Name: config.team2Name,
+      maxOvers: config.maxOvers,
+      targetScore: 0,
       totalRuns: 0,
       wickets: 0,
       overs: 0,
       balls: 0,
       extras: 0,
-      players: [],
+      players: [...team1Players, ...team2Players],
       oversList: [],
-      currentStrikerId: "",
-      currentNonStrikerId: "",
-      currentBowlerId: "",
+      currentStrikerId: '',
+      currentNonStrikerId: '',
+      currentBowlerId: '',
       isCompleted: false,
       createdAt: new Date().toISOString(),
+      currentInnings: 1,
+      innings1Score: 0,
+      innings1Wickets: 0,
+      innings1Balls: 0,
+      innings1Extras: 0,
+      innings1OversList: [],
     };
-
-    // Generate auto players with unique IDs based on match ID
-    const batsmen = Array.from({ length: 11 }, (_, i) => ({
-      id: `${newMatch.id}_bt${i + 1}`,
-      name: `BT${i + 1}`,
-      type: "batsman" as const,
-      runs: 0,
-      balls: 0,
-      wickets: 0,
-      runsConceded: 0,
-      oversBowled: 0,
-      isStriker: i === 0,
-      isNonStriker: i === 1,
-      isBowling: false,
-    }));
-
-    const bowlers = Array.from({ length: 5 }, (_, i) => ({
-      id: `${newMatch.id}_b${i + 1}`,
-      name: `B${i + 1}`,
-      type: "bowler" as const,
-      runs: 0,
-      balls: 0,
-      wickets: 0,
-      runsConceded: 0,
-      oversBowled: 0,
-      isStriker: false,
-      isNonStriker: false,
-      isBowling: i === 0,
-    }));
-
-    newMatch.players = [...batsmen, ...bowlers];
-    newMatch.currentStrikerId = batsmen[0].id;
-    newMatch.currentNonStrikerId = batsmen[1].id;
-    newMatch.currentBowlerId = bowlers[0].id;
 
     try {
       await databaseService.saveMatch(newMatch);
@@ -144,22 +139,22 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
   updateMatch: (updates) => {
     const currentMatch = get().currentMatch;
     if (!currentMatch) return;
-
     const updatedMatch = { ...currentMatch, ...updates };
     set({ currentMatch: updatedMatch });
-    // Note: Match is saved when navigating away or completing match, not on every ball
+    // Persist every update to prevent data loss on crash
+    databaseService.saveMatch(updatedMatch).catch((err) =>
+      console.error("Background save error:", err)
+    );
   },
 
   completeMatch: () => {
     const currentMatch = get().currentMatch;
     if (!currentMatch) return;
-
     const completedMatch = {
       ...currentMatch,
       isCompleted: true,
       completedAt: new Date().toISOString(),
     };
-
     set({ currentMatch: null });
     get().saveMatch(completedMatch);
   },
@@ -170,8 +165,6 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
       const matches = await databaseService.getMatches();
       const convertedMatches = matches.map((match) => convertFromDB(match));
       set({ matches: convertedMatches });
-
-      // Clear current match if it was deleted
       if (get().currentMatch?.id === id) {
         set({ currentMatch: null });
       }

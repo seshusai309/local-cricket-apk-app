@@ -5,13 +5,13 @@ import BallBox from '../BallBox/BallBox';
 import { ScoringEngine } from '../../utils/scoringEngine';
 
 const R = {
-  bg: '#1E3D2F',
-  bgCurrent: '#122B22',
-  text: '#F5F5DC',
-  textMuted: '#8FAF99',
-  accent: '#D4A017',
-  teal: '#00897B',
-  border: '#2E5040',
+  bg: '#FFFFFF',
+  bgCurrent: '#F0FFF4',
+  text: '#111111',
+  textMuted: '#666666',
+  accent: '#16A34A',
+  border: '#E0E0E0',
+  borderBright: '#CCCCCC',
   mono: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
 };
 
@@ -38,10 +38,9 @@ const OverRow: React.FC<OverRowProps> = ({ over, isCurrentOver = false }) => {
         <Text style={styles.summary}>{ScoringEngine.getOverSummary(over)}</Text>
         {isCurrentOver && ballsRemaining > 0 && (
           <View style={styles.ballsLeftBadge}>
-            <Text style={styles.ballsLeftText}>{ballsRemaining} left</Text>
+            <Text style={styles.ballsLeftText}>{ballsRemaining}</Text>
           </View>
         )}
-        <Text style={styles.runsLabel}>{over.totalRuns}R</Text>
       </View>
 
       {/* Balls */}
@@ -60,10 +59,10 @@ const OverRow: React.FC<OverRowProps> = ({ over, isCurrentOver = false }) => {
         }
       </ScrollView>
 
-      {/* Footer stats */}
+      {/* Footer */}
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          Runs: {over.totalRuns}  ·  Wkts: {over.wickets}  ·  Extras: {over.extras}
+          {over.totalRuns}R  ·  {over.wickets}W  ·  {over.extras}ex
         </Text>
       </View>
     </View>
@@ -73,10 +72,8 @@ const OverRow: React.FC<OverRowProps> = ({ over, isCurrentOver = false }) => {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: R.bg,
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: R.border,
-    marginHorizontal: 8,
+    padding: 10,
+    marginHorizontal: 6,
     marginVertical: 3,
     borderRadius: 10,
     borderWidth: 1,
@@ -84,17 +81,11 @@ const styles = StyleSheet.create({
   },
   currentContainer: {
     backgroundColor: R.bgCurrent,
-    borderLeftWidth: 3,
+    borderLeftWidth: 2,
     borderLeftColor: R.accent,
-    borderColor: R.accent,
-    shadowColor: R.accent,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 4,
+    borderColor: 'rgba(22,163,74,0.35)',
   },
 
-  // Header row
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -102,10 +93,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   overBadge: {
-    width: 30,
-    height: 30,
+    width: 28,
+    height: 28,
     borderRadius: 6,
-    backgroundColor: R.border,
+    backgroundColor: R.borderBright,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -113,43 +104,36 @@ const styles = StyleSheet.create({
     backgroundColor: R.accent,
   },
   overNum: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '900',
     color: R.text,
     fontFamily: R.mono,
   },
   overNumCurrent: {
-    color: '#122B22',
+    color: '#FFFFFF',
   },
   summary: {
-    fontSize: 12,
+    fontSize: 11,
     color: R.textMuted,
     flex: 1,
     fontFamily: R.mono,
     letterSpacing: 0.5,
   },
   ballsLeftBadge: {
-    backgroundColor: 'rgba(212,160,23,0.15)',
-    borderRadius: 8,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(212,160,23,0.35)',
+    borderColor: 'rgba(22,163,74,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   ballsLeftText: {
-    fontSize: 10,
-    fontWeight: '800',
+    fontSize: 9,
+    fontWeight: '900',
     color: R.accent,
     fontFamily: R.mono,
   },
-  runsLabel: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: R.text,
-    fontFamily: R.mono,
-  },
-
-  // Balls
   ballsRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -162,21 +146,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: R.border,
     marginRight: 4,
-    borderStyle: 'dashed',
   },
 
-  // Footer
   footer: {
     paddingTop: 6,
     borderTopWidth: 1,
     borderTopColor: R.border,
   },
   footerText: {
-    fontSize: 10,
+    fontSize: 9,
     color: R.textMuted,
     textAlign: 'center',
     fontFamily: R.mono,
-    letterSpacing: 0.3,
+    letterSpacing: 0.5,
   },
 });
 

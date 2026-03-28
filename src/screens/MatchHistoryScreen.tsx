@@ -11,15 +11,18 @@ import {
 import { useMatchStore } from '../store/matchStore';
 
 const R = {
-  bg: '#1B3A2F',
-  bgCard: '#1E4034',
-  bgCardAlt: '#1A3830',
-  text: '#F5F5DC',
-  textMuted: '#8FAF99',
-  accent: '#D4A017',
-  teal: '#00897B',
-  border: '#2E5040',
-  red: '#C62828',
+  bg: '#F5F5F5',
+  bgCard: '#FFFFFF',
+  bgCardAlt: '#F0F0F0',
+  text: '#111111',
+  textMuted: '#666666',
+  accent: '#16A34A',
+  accentDim: 'rgba(22,163,74,0.1)',
+  red: '#DC2626',
+  redDim: 'rgba(220,38,38,0.08)',
+  blue: '#2563EB',
+  border: '#E0E0E0',
+  borderBright: '#CCCCCC',
   mono: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
 };
 
@@ -45,9 +48,8 @@ const MatchHistoryScreen: React.FC<MatchHistoryScreenProps> = ({ navigation }) =
 
   const renderMatch = ({ item, index }: { item: any; index: number }) => {
     const oversDisplay = `${item.overs}.${item.balls % 6}`;
-    const rr = item.overs > 0 || item.balls % 6 > 0
-      ? (item.totalRuns / (item.balls / 6)).toFixed(1)
-      : '0.0';
+    const rr = item.balls > 0 ? (item.totalRuns / (item.balls / 6)).toFixed(1) : '0.0';
+    const isWon = (item.targetScore ?? 0) > 0 && item.totalRuns >= item.targetScore;
     const isEven = index % 2 === 0;
 
     return (
@@ -58,20 +60,55 @@ const MatchHistoryScreen: React.FC<MatchHistoryScreenProps> = ({ navigation }) =
       >
         {/* Top row */}
         <View style={styles.cardTop}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{item.teamName.charAt(0).toUpperCase()}</Text>
+          {/* Avatar letter */}
+          <View style={[styles.avatar, isWon && styles.avatarWon]}>
+            <Text style={[styles.avatarText, isWon && styles.avatarTextWon]}>
+              {item.teamName.charAt(0).toUpperCase()}
+            </Text>
           </View>
+
+          {/* Team info */}
           <View style={styles.cardInfo}>
-            <Text style={styles.cardTeam} numberOfLines={1}>{item.teamName}</Text>
+            <Text style={styles.cardTeam} numberOfLines={1}>
+              {item.teamName}{item.team2Name ? ` vs ${item.team2Name}` : ''}
+            </Text>
             <Text style={styles.cardDate}>{formatDate(item.createdAt)}</Text>
           </View>
+
+          {/* Score */}
           <View style={styles.scoreBadge}>
-            <Text style={styles.scoreMain}>{item.totalRuns}/{item.wickets}</Text>
-            <Text style={styles.scoreOvers}>{oversDisplay} ov</Text>
+            {item.innings1Score > 0 && item.team2Name ? (
+              // Two-innings match: show both
+              <>
+                <View style={styles.innLine}>
+                  <Text style={styles.innTag}>{item.teamName.substring(0, 3).toUpperCase()}</Text>
+                  <Text style={styles.innScore}>
+                    {item.innings1Score}/{item.innings1Wickets}
+                  </Text>
+                </View>
+                <View style={styles.innLine}>
+                  <Text style={[styles.innTag, { color: R.blue }]}>
+                    {item.team2Name.substring(0, 3).toUpperCase()}
+                  </Text>
+                  <Text style={[styles.innScore, isWon && { color: R.accent }]}>
+                    {item.totalRuns}/{item.wickets}
+                  </Text>
+                </View>
+                <Text style={styles.scoreOvers}>{oversDisplay} ov</Text>
+              </>
+            ) : (
+              // Single innings
+              <>
+                <Text style={[styles.scoreMain, isWon && { color: R.accent }]}>
+                  {item.totalRuns}<Text style={styles.scoreSlash}>/</Text>{item.wickets}
+                </Text>
+                <Text style={styles.scoreOvers}>{oversDisplay} ov</Text>
+              </>
+            )}
           </View>
         </View>
 
-        {/* Stats */}
+        {/* Stats strip */}
         <View style={styles.statsRow}>
           <View style={styles.stat}>
             <Text style={styles.statVal}>{rr}</Text>
@@ -87,11 +124,11 @@ const MatchHistoryScreen: React.FC<MatchHistoryScreenProps> = ({ navigation }) =
             <Text style={styles.statVal}>{item.maxOvers}</Text>
             <Text style={styles.statLbl}>OVERS</Text>
           </View>
-          {item.targetScore > 0 && (
+          {(item.targetScore ?? 0) > 0 && (
             <>
               <View style={styles.statDiv} />
               <View style={styles.stat}>
-                <Text style={[styles.statVal, { color: item.totalRuns >= item.targetScore ? R.teal : R.accent }]}>
+                <Text style={[styles.statVal, { color: isWon ? R.accent : R.red }]}>
                   {item.targetScore}
                 </Text>
                 <Text style={styles.statLbl}>TARGET</Text>
@@ -100,7 +137,7 @@ const MatchHistoryScreen: React.FC<MatchHistoryScreenProps> = ({ navigation }) =
           )}
         </View>
 
-        {/* Actions */}
+        {/* Won/result badge + actions */}
         <View style={styles.cardActions}>
           <TouchableOpacity
             style={styles.deleteBtn}
@@ -108,7 +145,12 @@ const MatchHistoryScreen: React.FC<MatchHistoryScreenProps> = ({ navigation }) =
           >
             <Text style={styles.deleteBtnText}>Delete</Text>
           </TouchableOpacity>
-          <Text style={styles.viewHint}>View Details  ›</Text>
+          {isWon && (
+            <View style={styles.wonBadge}>
+              <Text style={styles.wonBadgeText}>WON 🏆</Text>
+            </View>
+          )}
+          <Text style={styles.viewHint}>Details  ›</Text>
         </View>
       </TouchableOpacity>
     );
@@ -118,7 +160,7 @@ const MatchHistoryScreen: React.FC<MatchHistoryScreenProps> = ({ navigation }) =
     return (
       <View style={styles.container}>
         <View style={styles.emptyState}>
-          <Text style={styles.emptyEmoji}>📋</Text>
+          <Text style={styles.emptyNum}>00</Text>
           <Text style={styles.emptyTitle}>NO HISTORY YET</Text>
           <Text style={styles.emptySub}>Complete a match to see it here</Text>
         </View>
@@ -145,78 +187,109 @@ const styles = StyleSheet.create({
     backgroundColor: R.bg,
   },
   list: {
-    padding: 14,
-    gap: 10,
+    padding: 12,
+    gap: 8,
   },
 
   // Card
   card: {
     borderRadius: 16,
     padding: 16,
-    borderWidth: 1,
-    borderColor: R.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
+    borderWidth: 1.5,
+    borderColor: R.borderBright,
   },
   cardA: { backgroundColor: R.bgCard },
-  cardB: { backgroundColor: R.bgCardAlt },
+  cardB: { backgroundColor: '#E8E8E8' },
 
   cardTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
   },
   avatar: {
-    width: 46,
-    height: 46,
+    width: 48,
+    height: 48,
     borderRadius: 12,
-    backgroundColor: 'rgba(212,160,23,0.15)',
+    backgroundColor: R.bgCardAlt,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
     borderWidth: 1,
-    borderColor: 'rgba(212,160,23,0.35)',
+    borderColor: R.borderBright,
+  },
+  avatarWon: {
+    backgroundColor: R.accentDim,
+    borderColor: 'rgba(22,163,74,0.4)',
   },
   avatarText: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '900',
-    color: R.accent,
-    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+    color: R.textMuted,
+    fontFamily: R.mono,
   },
+  avatarTextWon: { color: R.accent },
   cardInfo: { flex: 1 },
   cardTeam: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 17,
+    fontWeight: '900',
     color: R.text,
-    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+    fontFamily: R.mono,
     marginBottom: 3,
+    letterSpacing: 0.5,
   },
   cardDate: {
     fontSize: 12,
     color: R.textMuted,
-    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+    fontFamily: R.mono,
+    fontWeight: '600',
   },
   scoreBadge: { alignItems: 'flex-end' },
   scoreMain: {
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: '900',
-    color: R.accent,
-    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+    color: R.text,
+    fontFamily: R.mono,
+    letterSpacing: -1,
+  },
+  scoreSlash: {
+    fontSize: 20,
+    fontWeight: '300',
+    color: R.borderBright,
   },
   scoreOvers: {
-    fontSize: 11,
+    fontSize: 10,
     color: R.textMuted,
     marginTop: 2,
-    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+    fontFamily: R.mono,
+  },
+  // Two-innings score display
+  innLine: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 5,
+    justifyContent: 'flex-end',
+  },
+  innTag: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: R.accent,
+    fontFamily: R.mono,
+    letterSpacing: 1,
+    minWidth: 28,
+    textAlign: 'right',
+  },
+  innScore: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: R.text,
+    fontFamily: R.mono,
+    letterSpacing: -0.5,
   },
 
   // Stats
   statsRow: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: R.bg,
     borderRadius: 10,
     padding: 10,
     marginBottom: 12,
@@ -226,65 +299,89 @@ const styles = StyleSheet.create({
   stat: { flex: 1, alignItems: 'center' },
   statDiv: { width: 1, backgroundColor: R.border },
   statVal: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '900',
     color: R.text,
-    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+    fontFamily: R.mono,
   },
   statLbl: {
     fontSize: 8,
+    fontWeight: '700',
     color: R.textMuted,
-    letterSpacing: 0.8,
+    letterSpacing: 1,
     marginTop: 2,
-    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+    fontFamily: R.mono,
   },
 
   // Actions
   cardActions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 10,
   },
   deleteBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 8,
-    backgroundColor: 'rgba(198,40,40,0.1)',
+    backgroundColor: R.redDim,
     borderWidth: 1,
-    borderColor: 'rgba(198,40,40,0.25)',
+    borderColor: 'rgba(220,38,38,0.25)',
   },
   deleteBtnText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
     color: R.red,
-    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+    fontFamily: R.mono,
+  },
+  wonBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: R.accentDim,
+    borderWidth: 1,
+    borderColor: 'rgba(22,163,74,0.35)',
+  },
+  wonBadgeText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: R.accent,
+    fontFamily: R.mono,
+    letterSpacing: 0.5,
   },
   viewHint: {
-    fontSize: 13,
+    fontSize: 12,
     color: R.textMuted,
     fontWeight: '700',
-    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+    fontFamily: R.mono,
+    marginLeft: 'auto',
   },
 
-  // Empty
+  // Empty state
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
   },
-  emptyEmoji: { fontSize: 48 },
-  emptyTitle: {
-    fontSize: 20,
+  emptyNum: {
+    fontSize: 80,
     fontWeight: '900',
-    color: R.accent,
+    color: R.borderBright,
+    fontFamily: R.mono,
+    letterSpacing: -4,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: R.text,
     letterSpacing: 2,
-    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+    fontFamily: R.mono,
   },
   emptySub: {
-    fontSize: 14,
+    fontSize: 13,
     color: R.textMuted,
     textAlign: 'center',
+    fontFamily: R.mono,
   },
 });
 

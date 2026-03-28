@@ -4,14 +4,12 @@ import { Modal, View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform }
 const { width } = Dimensions.get('window');
 
 const R = {
-  bg: '#1B3A2F',
-  bgCard: '#122B22',
-  text: '#F5F5DC',
-  textMuted: '#8FAF99',
-  accent: '#D4A017',
-  teal: '#00897B',
-  orange: '#E65100',
-  border: '#2E5040',
+  bg: '#FFFFFF',
+  bgCard: '#F5F5F5',
+  text: '#111111',
+  textMuted: '#666666',
+  orange: '#EA580C',
+  border: '#E0E0E0',
   mono: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
 };
 
@@ -29,21 +27,29 @@ const NoBallModal: React.FC<NoBallModalProps> = ({ visible, onSelect, onClose })
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.modal}>
-          <View style={styles.headerBar}>
-            <Text style={styles.headerLabel}>NO BALL</Text>
+
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>NB</Text>
           </View>
-          <Text style={styles.title}>NB — Runs Off Bat?</Text>
-          <Text style={styles.subtitle}>+1 no-ball penalty always added</Text>
+
+          <Text style={styles.title}>NO BALL</Text>
+          <Text style={styles.subtitle}>Runs scored off bat?</Text>
 
           <View style={styles.grid}>
             {scores.map((score) => (
               <TouchableOpacity
                 key={score}
-                style={styles.scoreBtn}
+                style={[styles.scoreBtn, score === 4 && styles.scoreBtnBlue, score === 6 && styles.scoreBtnAccent]}
                 onPress={() => onSelect(score)}
                 activeOpacity={0.75}
               >
-                <Text style={styles.scoreNum}>{score}</Text>
+                <Text style={[
+                  styles.scoreNum,
+                  score === 6 && styles.scoreNumAccent,
+                  score === 4 && styles.scoreNumBlue,
+                ]}>
+                  {score}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -60,53 +66,49 @@ const NoBallModal: React.FC<NoBallModalProps> = ({ visible, onSelect, onClose })
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.75)',
+    backgroundColor: 'rgba(0,0,0,0.65)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modal: {
     backgroundColor: R.bg,
     borderRadius: 20,
-    padding: 24,
+    padding: 28,
     width: width * 0.85,
     maxWidth: 320,
-    borderWidth: 2,
-    borderColor: R.orange,
-    shadowColor: R.orange,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 12,
+    borderWidth: 1,
+    borderColor: R.border,
     alignItems: 'center',
   },
-  headerBar: {
-    backgroundColor: R.orange,
-    paddingHorizontal: 20,
-    paddingVertical: 4,
+  badge: {
+    backgroundColor: 'rgba(234,88,12,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(234,88,12,0.45)',
     borderRadius: 20,
-    marginBottom: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 5,
+    marginBottom: 18,
   },
-  headerLabel: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#fff',
-    letterSpacing: 2,
+  badgeText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: R.orange,
+    letterSpacing: 3,
     fontFamily: R.mono,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: 22,
+    fontWeight: '900',
     color: R.text,
-    textAlign: 'center',
-    marginBottom: 6,
     fontFamily: R.mono,
+    letterSpacing: 1,
+    marginBottom: 6,
   },
   subtitle: {
     fontSize: 13,
     color: R.textMuted,
-    textAlign: 'center',
-    marginBottom: 24,
-    fontStyle: 'italic',
+    marginBottom: 28,
+    fontFamily: R.mono,
   },
   grid: {
     flexDirection: 'row',
@@ -116,38 +118,45 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   scoreBtn: {
-    width: 64,
-    height: 64,
+    width: 72,
+    height: 72,
     borderRadius: 14,
-    backgroundColor: 'rgba(0,137,123,0.18)',
+    backgroundColor: R.bgCard,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: R.teal,
-    shadowColor: R.teal,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
+    borderWidth: 1,
+    borderColor: R.border,
+  },
+  scoreBtnAccent: {
+    backgroundColor: 'rgba(22,163,74,0.1)',
+    borderColor: 'rgba(22,163,74,0.45)',
+  },
+  scoreBtnBlue: {
+    backgroundColor: 'rgba(37,99,235,0.1)',
+    borderColor: 'rgba(37,99,235,0.45)',
   },
   scoreNum: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: '900',
     color: R.text,
     fontFamily: R.mono,
   },
+  scoreNumAccent: {
+    color: '#16A34A',
+  },
+  scoreNumBlue: {
+    color: '#2563EB',
+  },
   cancelBtn: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    paddingVertical: 12,
-    paddingHorizontal: 32,
-    borderRadius: 10,
+    width: '100%',
+    paddingVertical: 13,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: R.border,
-    width: '100%',
     alignItems: 'center',
   },
   cancelText: {
-    fontSize: 15,
+    fontSize: 14,
     color: R.textMuted,
     fontWeight: '700',
     fontFamily: R.mono,

@@ -1,4 +1,4 @@
-import { Match, Ball, Over, Player, Highlight } from "../types";
+import { Match, Ball, Over, Highlight } from "../types";
 
 export interface ScoringAction {
   type: "run" | "wicket" | "wide" | "noball" | "1stbounce" | "dot" | "undo";
@@ -54,15 +54,19 @@ export class ScoringEngine {
   }
 
   private static handleRun(match: Match, runs: number): Match {
+    // Capture IDs before any rotation so ball record is always correct
+    const strikerIdForBall = match.currentStrikerId;
+    const bowlerIdForBall = match.currentBowlerId;
+
     match.totalRuns += runs;
 
-    const striker = match.players.find((p) => p.id === match.currentStrikerId);
+    const striker = match.players.find((p) => p.id === strikerIdForBall);
     if (striker) {
       striker.runs += runs;
       striker.balls += 1;
     }
 
-    const bowler = match.players.find((p) => p.id === match.currentBowlerId);
+    const bowler = match.players.find((p) => p.id === bowlerIdForBall);
     if (bowler) {
       bowler.runsConceded += runs;
     }
@@ -84,8 +88,8 @@ export class ScoringEngine {
       isNoBall: false,
       is1stBounce: false,
       isDot: false,
-      batsmanId: match.currentStrikerId,
-      bowlerId: match.currentBowlerId,
+      batsmanId: strikerIdForBall,
+      bowlerId: bowlerIdForBall,
     });
 
     return match;
@@ -94,9 +98,12 @@ export class ScoringEngine {
   private static handleWicket(match: Match): Match {
     match.wickets += 1;
 
-    const striker = match.players.find((p) => p.id === match.currentStrikerId);
+    const outBatsmanId = match.currentStrikerId; // capture before any rotation
+
+    const striker = match.players.find((p) => p.id === outBatsmanId);
     if (striker) {
       striker.balls += 1;
+      striker.isDismissed = true;
     }
 
     const bowler = match.players.find((p) => p.id === match.currentBowlerId);
@@ -123,19 +130,18 @@ export class ScoringEngine {
       isNoBall: false,
       is1stBounce: false,
       isDot: false,
-      batsmanId: match.currentStrikerId,
+      batsmanId: outBatsmanId, // always record who got out
       bowlerId: match.currentBowlerId,
     });
 
     return match;
   }
 
-  // Wide now accepts 0 or 1 extra runs (from WideModal)
-  // Total runs = 1 (wide penalty) + extraRuns
-  private static handleWide(match: Match, extraRuns: number = 0): Match {
-    const totalRuns = 1 + extraRuns;
+  // Wide: value from WideModal is the TOTAL runs (0 or 1)
+  // 0 = wide with no run, 1 = wide + 1 run
+  private static handleWide(match: Match, totalRuns: number = 1): Match {
     match.totalRuns += totalRuns;
-    match.extras += 1; // Only 1 extra counted (the wide penalty)
+    match.extras += totalRuns;
 
     const bowler = match.players.find((p) => p.id === match.currentBowlerId);
     if (bowler) {
@@ -202,15 +208,18 @@ export class ScoringEngine {
   }
 
   private static handle1stBounce(match: Match, runs: number = 0): Match {
+    const strikerIdForBall = match.currentStrikerId;
+    const bowlerIdForBall = match.currentBowlerId;
+
     match.totalRuns += runs;
 
-    const striker = match.players.find((p) => p.id === match.currentStrikerId);
+    const striker = match.players.find((p) => p.id === strikerIdForBall);
     if (striker) {
       striker.runs += runs;
       striker.balls += 1;
     }
 
-    const bowler = match.players.find((p) => p.id === match.currentBowlerId);
+    const bowler = match.players.find((p) => p.id === bowlerIdForBall);
     if (bowler) {
       bowler.runsConceded += runs;
     }
@@ -232,15 +241,18 @@ export class ScoringEngine {
       isNoBall: false,
       is1stBounce: true,
       isDot: false,
-      batsmanId: match.currentStrikerId,
-      bowlerId: match.currentBowlerId,
+      batsmanId: strikerIdForBall,
+      bowlerId: bowlerIdForBall,
     });
 
     return match;
   }
 
   private static handleDot(match: Match): Match {
-    const striker = match.players.find((p) => p.id === match.currentStrikerId);
+    const strikerIdForBall = match.currentStrikerId;
+    const bowlerIdForBall = match.currentBowlerId;
+
+    const striker = match.players.find((p) => p.id === strikerIdForBall);
     if (striker) {
       striker.balls += 1;
     }
@@ -262,8 +274,8 @@ export class ScoringEngine {
       isNoBall: false,
       is1stBounce: false,
       isDot: true,
-      batsmanId: match.currentStrikerId,
-      bowlerId: match.currentBowlerId,
+      batsmanId: strikerIdForBall,
+      bowlerId: bowlerIdForBall,
     });
 
     return match;
@@ -279,7 +291,7 @@ export class ScoringEngine {
 
     if (lastBall.isWide || lastBall.isNoBall) {
       match.totalRuns = Math.max(0, match.totalRuns - lastBall.runs);
-      match.extras = Math.max(0, match.extras - 1);
+      match.extras = Math.max(0, match.extras - lastBall.runs);
 
       const bowler = match.players.find((p) => p.id === lastBall.bowlerId);
       if (bowler) {
@@ -360,8 +372,9 @@ export class ScoringEngine {
 
     if (!currentOver) {
       currentOver = {
-        id: `over_${currentOverNumber}`,
+        id: `over_${currentOverNumber}_inn${match.currentInnings ?? 1}`,
         overNumber: currentOverNumber,
+        inningsNumber: (match.currentInnings ?? 1) as (1 | 2),
         balls: [],
         totalRuns: 0,
         wickets: 0,
@@ -394,23 +407,58 @@ export class ScoringEngine {
   }
 
   private static nextBatsman(match: Match): void {
-    const availableBatsmen = match.players.filter(
-      (p) => p.type === "batsman" && !p.isStriker && !p.isNonStriker,
+    const battingTeam = (match.currentInnings ?? 1) === 1 ? 'team1' : 'team2';
+    const available = match.players.filter(
+      (p) => p.teamId === battingTeam && !p.isDismissed && !p.isStriker && !p.isNonStriker,
     );
 
-    if (availableBatsmen.length > 0) {
-      const nextBatsman = availableBatsmen[0];
-      const outBatsman = match.players.find(
-        (p) => p.id === match.currentStrikerId,
-      );
-
-      if (outBatsman) {
-        outBatsman.isStriker = false;
-      }
-
-      nextBatsman.isStriker = true;
-      match.currentStrikerId = nextBatsman.id;
+    if (available.length > 0) {
+      available[0].isStriker = true;
+      match.currentStrikerId = available[0].id;
     }
+  }
+
+  /**
+   * Transition from innings 1 to innings 2.
+   * Archives innings 1 stats, resets scoring state,
+   * swaps batting/bowling teams, sets the target.
+   */
+  static startInnings2(match: Match): Match {
+    const updated: Match = JSON.parse(JSON.stringify(match));
+
+    // Archive innings 1
+    updated.innings1Score = updated.totalRuns;
+    updated.innings1Wickets = updated.wickets;
+    updated.innings1Balls = updated.balls;
+    updated.innings1Extras = updated.extras;
+    updated.innings1OversList = updated.oversList.map(o => ({ ...o, inningsNumber: 1 as const }));
+
+    // Set innings 2 target
+    updated.targetScore = updated.totalRuns + 1;
+    updated.currentInnings = 2;
+
+    // Reset scoring state
+    updated.totalRuns = 0;
+    updated.wickets = 0;
+    updated.balls = 0;
+    updated.overs = 0;
+    updated.extras = 0;
+    updated.oversList = [];
+
+    // Clear all active flags and dismissed state for new innings
+    updated.players.forEach(p => {
+      p.isStriker = false;
+      p.isNonStriker = false;
+      p.isBowling = false;
+      p.isDismissed = false;
+    });
+
+    // Openers and bowler will be chosen by user via setup modals in LiveMatchScreen
+    updated.currentStrikerId = '';
+    updated.currentNonStrikerId = '';
+    updated.currentBowlerId = '';
+
+    return updated;
   }
 
   static getOverSummary(over: Over): string {
@@ -426,13 +474,13 @@ export class ScoringEngine {
   }
 
   static getBallColor(ball: Ball): string {
-    if (ball.is1stBounce) return "#6A1B9A";
-    if (ball.runs === 6 && !ball.isWide && !ball.isNoBall) return "#2E7D32";
-    if (ball.runs === 4 && !ball.isWide && !ball.isNoBall) return "#1565C0";
-    if (ball.isWicket) return "#C62828";
-    if (ball.isWide || ball.isNoBall) return "#E65100";
-    if (ball.isDot) return "#37474F";
-    return "#00695C";
+    if (ball.isWicket) return "#DC2626";
+    if (ball.isWide || ball.isNoBall) return "#EA580C";
+    if (ball.runs === 6 && !ball.isWide && !ball.isNoBall) return "#16A34A";
+    if (ball.runs === 4 && !ball.isWide && !ball.isNoBall) return "#2563EB";
+    if (ball.is1stBounce) return "#7C3AED";
+    if (ball.isDot) return "#D1D5DB";
+    return "#9CA3AF";
   }
 
   // Compute highlights from oversList for a match

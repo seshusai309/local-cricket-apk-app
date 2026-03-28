@@ -17,9 +17,9 @@ SplashScreen.preventAutoHideAsync();
 const Stack = createNativeStackNavigator();
 
 const HEADER = {
-  bg: '#122B22',
-  text: '#D4A017',
-  border: '#2E5040',
+  bg: '#FFFFFF',
+  text: '#111111',
+  tint: '#16A34A',
   mono: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
 };
 
@@ -51,16 +51,16 @@ const App: React.FC = () => {
         initialRouteName="Home"
         screenOptions={{
           headerStyle: { backgroundColor: HEADER.bg },
-          headerTintColor: HEADER.text,
+          headerTintColor: HEADER.tint,
           headerTitleStyle: {
             fontWeight: '900',
-            fontSize: 15,
+            fontSize: 14,
             fontFamily: HEADER.mono,
-            letterSpacing: 1,
+            letterSpacing: 2,
             color: HEADER.text,
           },
           headerShadowVisible: false,
-          contentStyle: { backgroundColor: '#1B3A2F' },
+          contentStyle: { backgroundColor: '#F5F5F5' },
         }}
       >
         <Stack.Screen
@@ -71,22 +71,22 @@ const App: React.FC = () => {
         <Stack.Screen
           name="CreateMatch"
           component={CreateMatchScreen}
-          options={{ title: '🏏 NEW MATCH' }}
+          options={{ title: 'NEW MATCH' }}
         />
         <Stack.Screen
           name="LiveMatch"
           component={LiveMatchScreen}
-          options={{ title: '🟢 LIVE', gestureEnabled: false }}
+          options={{ title: 'LIVE', gestureEnabled: false }}
         />
         <Stack.Screen
           name="MatchHistory"
           component={MatchHistoryScreen}
-          options={{ title: '📋 HISTORY' }}
+          options={{ title: 'HISTORY' }}
         />
         <Stack.Screen
           name="MatchDetail"
           component={MatchDetailScreen}
-          options={{ title: '📊 DETAILS' }}
+          options={{ title: 'DETAILS' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

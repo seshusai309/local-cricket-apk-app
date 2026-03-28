@@ -1,7 +1,9 @@
 export interface Player {
   id: string;
   name: string;
-  type: "batsman" | "bowler";
+  type: 'player';          // all players are equal — role is decided during play
+  teamId: 'team1' | 'team2';
+  isDismissed: boolean;    // true once the player is out
   runs: number;
   balls: number;
   wickets: number;
@@ -29,6 +31,7 @@ export interface Ball {
 export interface Over {
   id: string;
   overNumber: number;
+  inningsNumber: 1 | 2;
   balls: Ball[];
   totalRuns: number;
   wickets: number;
@@ -46,9 +49,16 @@ export interface Highlight {
   emoji: string;
 }
 
+export interface SavedTeam {
+  id: string;
+  name: string;
+  players: string[];  // 11 player names
+}
+
 export interface Match {
   id: string;
-  teamName: string;
+  teamName: string;        // team1 name (batting first)
+  team2Name: string;       // team2 name (batting second)
   maxOvers: number;
   targetScore: number;
   totalRuns: number;
@@ -57,13 +67,20 @@ export interface Match {
   balls: number;
   extras: number;
   players: Player[];
-  oversList: Over[];
+  oversList: Over[];       // current innings overs
   currentStrikerId: string;
   currentNonStrikerId: string;
   currentBowlerId: string;
   isCompleted: boolean;
   createdAt: string;
   completedAt?: string;
+  // Two-innings support
+  currentInnings: 1 | 2;
+  innings1Score: number;
+  innings1Wickets: number;
+  innings1Balls: number;
+  innings1Extras: number;
+  innings1OversList: Over[];
 }
 
 export interface MatchState {
